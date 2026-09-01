@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Lint, typecheck, test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Ruff lint
+        run: uv run ruff check --output-format=github .
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
+      - name: Mypy
+        run: uv run mypy purse
+
+      - name: Pytest
+        run: uv run pytest
+
+  container:
+    name: Compose config and image build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate compose file
+        # Placeholder values only — the point is that the file interpolates and
+        # parses, and that no secret is required from the repository to do so.
+        env:
+          POSTGRES_PASSWORD: ci-placeholder
+          DATABASE_URL: postgresql://purse:ci-placeholder@db:5432/purse
+        run: docker compose -f docker-compose.dev.yml config --quiet
+
+      - name: Assert no secrets are hardcoded in the compose file
+        # Flags a credential-ish key whose value is a literal. Values that are
+        # environment interpolations (${VAR}, ${VAR:-default}, ${VAR:?message})
+        # start with '$' and are allowed — that is the whole point.
+        run: |
+          if grep -nEi '^[[:space:]]*[a-z0-9_]*(password|secret|token|api_?key)[a-z0-9_]*[[:space:]]*:[[:space:]]*[^$[:space:]]' docker-compose.dev.yml; then
+            echo "::error file=docker-compose.dev.yml::Credentials must come from the environment, not literals."
+            exit 1
+          fi
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build app image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: purse:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test the image
+        run: docker run --rm purse:ci

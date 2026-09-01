@@ -1,0 +1,147 @@
+name: Client compatibility
+description: An MCP client fails to connect, authenticate, or call Purse tools
+title: "client: "
+labels: ["type:bug", "area:clients"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Purse's launch gate is **seven clients green**. Client quirks are the single biggest source of breakage — connect flows, callback URLs, header pickiness, transport differences — so these reports are genuinely valuable, including for clients not yet on our list.
+
+        **Redact before posting:** tokens, client secrets, authorization codes, and full URLs containing `code=` or `state=` parameters.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight
+      options:
+        - label: I have redacted all tokens, secrets, and authorization codes from this report.
+          required: true
+        - label: I searched existing issues for this client.
+          required: true
+
+  - type: dropdown
+    id: client
+    attributes:
+      label: Client
+      options:
+        - "Claude web"
+        - "Claude Desktop"
+        - "Claude mobile"
+        - "Claude Code"
+        - "Cursor"
+        - "ChatGPT"
+        - "VS Code"
+        - "Codex (CLI)"
+        - "Codex (IDE / Desktop)"
+        - "OpenClaw"
+        - "Other headless / framework MCP client"
+        - "Other (specify below)"
+    validations:
+      required: true
+
+  - type: input
+    id: client-version
+    attributes:
+      label: Client name and version
+      description: Exact client build. If you picked "Other" above, name it here.
+      placeholder: "Claude Code 2.1.4 / Cursor 0.48 / codex-cli 0.9.2"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: auth-mode
+    attributes:
+      label: Auth mode
+      options:
+        - "OAuth 2.1 + PKCE"
+        - "OAuth — Dynamic Client Registration (DCR)"
+        - "OAuth — Client ID Metadata Document (CIMD)"
+        - "OAuth — static pre-registered client"
+        - "OAuth — loopback redirect (localhost / 127.0.0.1)"
+        - "Personal access token (PAT)"
+        - "Unknown"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: transport
+    attributes:
+      label: Transport
+      options:
+        - "Streamable HTTP"
+        - "SSE (deprecated)"
+        - "stdio via mcp-remote bridge"
+        - "Other / unknown"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: stage
+    attributes:
+      label: Where it fails
+      options:
+        - "Adding the server / discovery"
+        - "Client registration (DCR / CIMD / static)"
+        - "Authorization redirect or callback"
+        - "Token exchange or refresh"
+        - "Tool listing"
+        - "Tool call"
+        - "Works, but with caveats worth documenting"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Purse deployment
+      options:
+        - "Self-hosted on localhost"
+        - "Self-hosted behind a tunnel (Tailscale / ngrok / cloudflared)"
+        - "Self-hosted on a public domain with TLS"
+        - "Hosted"
+    validations:
+      required: true
+
+  - type: input
+    id: purse-version
+    attributes:
+      label: Purse version / commit
+      placeholder: "0.0.1 or git SHA"
+    validations:
+      required: true
+
+  - type: textarea
+    id: error
+    attributes:
+      label: Error message
+      description: The exact error shown by the client (or the HTTP status and error code returned by Purse).
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps taken
+      description: Config used and what you did — e.g. the `.cursor/mcp.json` entry, the `claude mcp add` command, the `~/.codex/config.toml` block. Redact tokens.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Client-side logs and, if you have them, Purse server logs from the same attempt. Redact tokens, codes, and client secrets.
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: Workarounds that helped, whether removing and re-adding the connector changed the outcome, other servers that do work in the same client.
+    validations:
+      required: false

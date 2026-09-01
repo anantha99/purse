@@ -1,0 +1,55 @@
+# Purse — development stack: Postgres + pgvector, and a placeholder app container.
+#
+# Configuration is environment variables only. No secrets appear in this file:
+# every credential is interpolated from .env (see .env.example), and required
+# values use the ${VAR:?message} form so compose fails fast rather than booting
+# with a default password.
+#
+#   cp .env.example .env   # then edit POSTGRES_PASSWORD
+#   docker compose -f docker-compose.dev.yml up db
+
+name: purse-dev
+
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-purse}
+      POSTGRES_DB: ${POSTGRES_DB:-purse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      # Deterministic initdb settings so local databases match CI.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - purse-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "${POSTGRES_USER:-purse}" -d "${POSTGRES_DB:-purse}"
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Placeholder wiring. The gateway (C4) replaces the command below; these
+      # values are read from the environment and never hardcoded here.
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in .env}
+      PURSE_BASE_URL: ${PURSE_BASE_URL:-http://localhost:8000}
+      PURSE_LOG_LEVEL: ${PURSE_LOG_LEVEL:-info}
+    # Placeholder until the MCP gateway exists — proves the image builds and the
+    # package imports inside the container.
+    command: ["python", "-c", "import purse; print(purse.__version__)"]
+
+volumes:
+  purse-db-data:

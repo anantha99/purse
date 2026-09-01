@@ -1,0 +1,105 @@
+name: Bug report
+description: Something in Purse behaves incorrectly
+title: "bug: "
+labels: ["type:bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Purse is pre-alpha — rough edges are expected, but bugs still get fixed.
+
+        **Do not report security vulnerabilities here.** Use the private channel described in `SECURITY.md` (Security tab -> Report a vulnerability).
+
+        If a specific MCP client fails to connect or authenticate, use the **Client compatibility** template instead.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight
+      options:
+        - label: This is not a security vulnerability (those go through GitHub Security Advisories).
+          required: true
+        - label: I searched existing issues and this is not a duplicate.
+          required: true
+        - label: My report contains no API keys, tokens, or other secret material.
+          required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What went wrong, and what you expected instead.
+      placeholder: |
+        Expected: search_memory returns the fact I saved from Cursor.
+        Actual: it returns an empty result set.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps. A minimal reproduction is worth more than a long description.
+      placeholder: |
+        1. docker compose -f docker-compose.dev.yml up
+        2. Connect Claude Code with a PAT
+        3. Call add_memory with ...
+        4. Call search_memory with ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of Purse? (See TASKS.md clusters.)
+      options:
+        - "Not sure"
+        - "repo / build / CI"
+        - "data layer"
+        - "auth & connect"
+        - "memory"
+        - "MCP gateway & tools"
+        - "skills"
+        - "secrets & proxy"
+        - "web UI"
+        - "client compatibility"
+        - "self-hosting"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment
+      options:
+        - "Self-hosted (docker compose)"
+        - "Local dev checkout"
+        - "Hosted"
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Purse version / commit
+      placeholder: "0.0.1 or git SHA"
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: OS and Python version
+      placeholder: "macOS 15.3, Python 3.12.8"
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or error output
+      description: Server logs, tool errors, or stack traces. This is rendered as a code block — redact anything sensitive first.
+      render: text
+    validations:
+      required: false

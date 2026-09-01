@@ -1,0 +1,75 @@
+name: Feature request
+description: Suggest something Purse should do
+title: "feat: "
+labels: ["type:feat"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Purse is deliberately narrow: **a bag, not a brain.** It stores and serves memory, skills, and API access — it does not orchestrate agents, summarise conversations, or decide anything.
+
+        Before filing, please check `TASKS.md` in the repository root — the idea may already be planned, or explicitly deferred.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Preflight
+      options:
+        - label: I checked TASKS.md and this is not already planned or listed as deferred.
+          required: true
+        - label: I searched existing issues and this is not a duplicate.
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do that Purse makes hard or impossible? Describe the situation, not the solution.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What should Purse do? If it touches the MCP surface, sketch the tool, params, returns, and required scope.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds you tried, or other designs you rejected and why.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - "Not sure"
+        - "repo / build / CI"
+        - "data layer"
+        - "auth & connect"
+        - "memory"
+        - "MCP gateway & tools"
+        - "skills"
+        - "secrets & proxy"
+        - "web UI"
+        - "client compatibility"
+        - "self-hosting"
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: principles
+    attributes:
+      label: Fit with product principles
+      description: Tick the ones that hold. A request that breaks one of these is unlikely to land — but say so and make the case in the description.
+      options:
+        - label: It keeps Purse a store, not an orchestrator or a summariser.
+        - label: It does not require any secret material to leave the server.
+        - label: It preserves attributable, append-only writes.
+        - label: It does not gate anything behind hosted-only (self-host stays the full single-user product).

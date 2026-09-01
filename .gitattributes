@@ -1,0 +1,11 @@
+# Normalize all text files to LF in the repo and on checkout, so Windows
+# contributors (core.autocrlf=true) cannot introduce CRLF drift that breaks
+# `ruff format --check` on ubuntu-latest CI.
+* text=auto eol=lf
+
+# Binary-safe exceptions
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.woff2 binary
