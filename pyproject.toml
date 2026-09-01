@@ -42,6 +42,10 @@ packages = ["purse"]
 line-length = 100
 target-version = "py312"
 src = ["purse", "tests"]
+# Markdown docs carry illustrative code fragments (e.g. quoted excerpts of
+# third-party source in spike reports) that are not valid standalone code —
+# ruff's markdown formatting would mangle them.
+extend-exclude = ["*.md"]
 
 [tool.ruff.lint]
 select = [
