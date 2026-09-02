@@ -365,7 +365,13 @@ def test_fallback_search_treats_wildcards_literally(session: Session, ctx: StubC
     assert [hit.id for hit in service.search_memory(session, ctx, NullEngine(), query="80%")] == [
         match.id
     ]
-    assert service.search_memory(session, ctx, NullEngine(), query="%") == []
+    # Escaped, "%" matches only the memory containing a literal percent sign.
+    # Un-escaped, it would be the ILIKE match-anything wildcard and return both.
+    assert [hit.id for hit in service.search_memory(session, ctx, NullEngine(), query="%")] == [
+        match.id
+    ]
+    # "_" is ILIKE's single-character wildcard; escaped, it matches nothing here.
+    assert service.search_memory(session, ctx, NullEngine(), query="_") == []
 
 
 def test_search_excludes_tombstoned_and_superseded_memories(
