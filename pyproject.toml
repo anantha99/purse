@@ -23,9 +23,12 @@ dependencies = [
     # REST gateway (C3.8) — the pre-MCP smoke path. Deliberately NO uvicorn:
     # this package ships an ASGI app, not a server. Serving it (uvicorn/gunicorn,
     # compose entrypoint) lands with C4/C9 self-hosting.
+    "authlib>=1.6",
     "fastapi>=0.141.1",
     # pgvector's SQLAlchemy type. The extension itself comes from the
     # pgvector/pgvector:pg17 image.
+    "fastmcp==4.0.0",
+    "itsdangerous>=2.2",
     "pgvector>=0.3.6",
     # psycopg 3. The binary extra ships wheels, so there is no libpq build step
     # on any supported interpreter (3.12-3.14).
