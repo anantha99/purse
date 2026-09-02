@@ -346,11 +346,11 @@ def test_an_auth_shaped_context_without_an_agent_id_is_a_valid_caller() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_the_documented_surface_is_exactly_the_five_memory_endpoints(
+def test_the_documented_surface_is_exactly_the_memory_and_skills_endpoints(
     client: TestClient,
 ) -> None:
-    """PRD §10 lists five memory tools. The REST smoke path mirrors them, and
-    exposes nothing else."""
+    """PRD §10's five memory tools and three skills tools — the REST smoke path
+    mirrors them, and exposes nothing else."""
     schema = client.get("/openapi.json").json()
     routes = {
         (method.upper(), path) for path, methods in schema["paths"].items() for method in methods
@@ -361,4 +361,7 @@ def test_the_documented_surface_is_exactly_the_five_memory_endpoints(
         ("GET", "/v1/memories/search"),
         ("PATCH", "/v1/memories/{memory_id}"),
         ("DELETE", "/v1/memories/{memory_id}"),
+        ("GET", "/v1/skills"),
+        ("GET", "/v1/skills/{name}"),
+        ("PUT", "/v1/skills/{name}"),
     }

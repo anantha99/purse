@@ -33,6 +33,7 @@ dependencies = [
     # psycopg 3. The binary extra ships wheels, so there is no libpq build step
     # on any supported interpreter (3.12-3.14).
     "psycopg[binary]>=3.2",
+    "pyyaml>=6.0.3",
     "sqlalchemy>=2.0.36",
     "uvicorn>=0.30",
 ]
@@ -127,6 +128,14 @@ pretty = true
 # `strict` shorthand inside a per-module override but applies it to the WHOLE
 # project, silently making every package strict; the individual flags scope
 # correctly. Verified against mypy 2.3.1.
+# PyYAML ships no type stubs (no `py.typed`, and `types-PyYAML` is a separate
+# package we deliberately do not depend on). The skills frontmatter parser is the
+# only user; ignore the missing stubs for the `yaml` module alone rather than
+# pulling in another dependency for one import.
+[[tool.mypy.overrides]]
+module = ["yaml"]
+ignore_missing_imports = true
+
 [[tool.mypy.overrides]]
 module = ["purse.auth.*", "purse.secrets.*"]
 disallow_untyped_defs = true
