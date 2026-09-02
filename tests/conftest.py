@@ -119,3 +119,103 @@ def db_session(migrated_engine: Engine) -> Iterator[Session]:
         session.close()
         transaction.rollback()
         connection.close()
+
+
+# ---------------------------------------------------------------------------
+# Memory / gateway fakes (C3)
+# ---------------------------------------------------------------------------
+#
+# Appended rather than merged into the block above so the C1 fixtures keep their
+# original shape and history. The imports are therefore not at the top of the
+# file, which is what the `noqa: E402` markers are for — they support the
+# append, they are not a lint the code failed on its merits.
+#
+# These live in the shared conftest because both `tests/memory` and
+# `tests/gateway` need the same authenticated-caller stub and the same engine
+# doubles, and pytest makes fixtures visible to both without an import.
+
+import dataclasses  # noqa: E402
+from collections.abc import Iterable  # noqa: E402
+
+from purse.memory.engine import EngineHit, MemoryEngine  # noqa: E402
+from purse.memory.records import MemoryRecord  # noqa: E402
+
+
+@dataclasses.dataclass(frozen=True)
+class StubContext:
+    """An already-authenticated caller.
+
+    Satisfies `purse.memory.context.WriteContext` and
+    `purse.gateway.rest.GatewayContext` structurally — which is the point of
+    those being Protocols. No `purse.auth` import, so the memory and gateway
+    suites stay green while C2 is still being built in parallel.
+    """
+
+    connection_id: uuid.UUID
+    workspace_id: uuid.UUID
+    agent_id: str | None = None
+    scopes: tuple[str, ...] = ("memory:read", "memory:write")
+    writes_enabled: bool = True
+
+
+class RecordingEngine(MemoryEngine):
+    """Remembers every call and returns whatever hits it was handed.
+
+    Lets a test assert that the canonical path *reached* the engine, and drive
+    the engine-first branch of `search_memory` without a real index.
+    """
+
+    def __init__(self, hits: list[EngineHit] | None = None) -> None:
+        self.hits = hits if hits is not None else []
+        self.ingested: list[MemoryRecord] = []
+        self.searched: list[tuple[uuid.UUID, str, int]] = []
+        self.rebuilt: list[uuid.UUID] = []
+        self.dropped: list[uuid.UUID] = []
+
+    def ingest(self, record: MemoryRecord, *, workspace_id: uuid.UUID) -> None:
+        self.ingested.append(record)
+
+    def search(self, workspace_id: uuid.UUID, query: str, limit: int) -> list[EngineHit]:
+        self.searched.append((workspace_id, query, limit))
+        return list(self.hits[:limit])
+
+    def rebuild(self, workspace_id: uuid.UUID, records: Iterable[MemoryRecord]) -> None:
+        self.rebuilt.append(workspace_id)
+        list(records)
+
+    def drop(self, workspace_id: uuid.UUID) -> None:
+        self.dropped.append(workspace_id)
+
+
+class EngineFailure(RuntimeError):
+    """Distinctive enough that a test can tell it apart from a real bug."""
+
+
+class RaisingEngine(MemoryEngine):
+    """Every method explodes. The engine an outage looks like.
+
+    PRD §8.2 / C3.3: an engine failure must never fail a canonical write. This
+    is how that is proved rather than asserted.
+    """
+
+    def ingest(self, record: MemoryRecord, *, workspace_id: uuid.UUID) -> None:
+        raise EngineFailure("ingest exploded")
+
+    def search(self, workspace_id: uuid.UUID, query: str, limit: int) -> list[EngineHit]:
+        raise EngineFailure("search exploded")
+
+    def rebuild(self, workspace_id: uuid.UUID, records: Iterable[MemoryRecord]) -> None:
+        raise EngineFailure("rebuild exploded")
+
+    def drop(self, workspace_id: uuid.UUID) -> None:
+        raise EngineFailure("drop exploded")
+
+
+@pytest.fixture
+def recording_engine() -> RecordingEngine:
+    return RecordingEngine()
+
+
+@pytest.fixture
+def raising_engine() -> RaisingEngine:
+    return RaisingEngine()
