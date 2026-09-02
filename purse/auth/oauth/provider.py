@@ -152,11 +152,18 @@ class StaticClient:
 #
 # Verified from the live document on 2026-09-02. Add Claude web / ChatGPT here as
 # each is tested (their CIMD URLs and callbacks differ from Claude Code's).
+# Registered with the full scope set: a client may *request* any scope; what is
+# actually granted is still decided by the consent policy (first connection gets
+# writes, later ones default read-only, PRD §7.1). Without this, the SDK rejects
+# the request with invalid_scope before it ever reaches the approve page.
+_ALL_SCOPE_STRINGS: tuple[str, ...] = tuple(sorted(scope.value for scope in ALL_SCOPES))
+
 KNOWN_CIMD_CLIENTS: tuple[StaticClient, ...] = (
     StaticClient(
         client_id="https://claude.ai/oauth/claude-code-client-metadata",
         redirect_uris=("http://localhost/callback", "http://127.0.0.1/callback"),
         client_secret=None,  # public client (token_endpoint_auth_method = none)
+        scopes=_ALL_SCOPE_STRINGS,
         client_name="Claude Code",
     ),
 )

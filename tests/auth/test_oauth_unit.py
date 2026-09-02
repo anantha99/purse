@@ -229,6 +229,10 @@ def test_known_cimd_client_resolves_locally_without_a_fetch() -> None:
     assert isinstance(client, PurseClient)
     assert client.client_name == "Claude Code"
     assert client.token_endpoint_auth_method == "none"  # noqa: S105 - auth-method name, public client
+    # Registered with the scopes it may request, or the SDK rejects the authorize
+    # with invalid_scope before the consent page (what's granted is still policy).
+    assert "memory:read" in (client.scope or "")
+    assert "memory:write" in (client.scope or "")
     assert str(client.validate_redirect_uri(AnyUrl("http://localhost:3118/callback"))).startswith(
         "http://localhost:3118"
     )
