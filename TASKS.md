@@ -69,14 +69,14 @@ Order chosen by which client each mode unblocks (§9), not by spec elegance.
 
 - [x] C2.1 **PAT** — `purse_pat_` tokens, 256-bit, sha256-at-rest, redacting token type, shown once; revocable; no failure-mode oracle (revoked == unknown); constant-time compare. Bootstrap prints credentials once *(PR #2)*
 - [x] C2.2 Scope model: six scopes, onboarding/default grant sets, `AuthContext` + `require_scope`; `writes_enabled=False` hard-cuts write scopes even when granted *(PR #2)*
-- [ ] C2.3 OAuth 2.1 core: authorization code + PKCE, token expiry + refresh (M2)
-- [ ] C2.4 Discovery metadata: RFC 8414 + RFC 9728 (M2)
-- [ ] C2.5 **CIMD — now the primary OAuth path** (spec 2026-07-28 deprecates DCR): wire FastMCP's `CIMDClientManager` + `PrivateKeyJWTClientAuthenticator`; AS metadata MUST advertise `client_id_metadata_document_supported: true` AND `"none"` in `token_endpoint_auth_methods_supported` (Anthropic gates on both — vanilla provider silently downgrades to DCR). Unblocks: Claude surfaces, ChatGPT, VS Code (M2)
-- [ ] C2.6 **Loopback redirects, port-agnostic**: `http://localhost/callback` + `http://127.0.0.1/callback`, any port — port `_matches_registered_loopback_redirect_uri` (~25 lines) from FastMCP `oauth_proxy/models.py`. Unblocks: Claude Code (M2)
-- [ ] C2.7 **Static pre-registered clients** + admin UI registration. Unblocks: Cursor (M2)
-- [ ] C2.8 **DCR** (RFC 7591) — compatibility fallback for clients not yet on CIMD; native in FastMCP 4 via `RegistrationHandler`. Honour SEP-837 `application_type`. (Dropped: the "401 re-registration signal" — not documented client behavior) (M2)
-- [ ] C2.9 Callback allowlist: claude.ai AND claude.com callbacks; ChatGPT's distinct callback; never assume hosts share OAuth identity (§8.5)
-- [ ] C2.10 Rate limits: writes 60/min, `use_api` 30/min per connection (§13)
+- [x] C2.3 OAuth 2.1 core: authorization code + PKCE (S256, constant-time), opaque access+refresh tokens on the connections table *(PR #3)*
+- [x] C2.4 Discovery metadata: RFC 8414 + RFC 9728, mounted at root *(PR #3)*
+- [x] C2.5 **CIMD — primary path**: metadata advertises `client_id_metadata_document_supported: true` AND `"none"` in `token_endpoint_auth_methods_supported` (anti-downgrade gate asserted in tests + boot smoke test) *(PR #3)*
+- [x] C2.6 **Loopback redirects, port-agnostic**: localhost/127.0.0.1/[::1] any port, rejects other hosts + userinfo smuggling *(PR #3)*
+- [x] C2.7 **Static pre-registered clients** via `StaticClient` (Cursor). Admin-UI registration deferred to C7 *(PR #3)*
+- [x] C2.8 **DCR** (RFC 7591) — compatibility fallback, persisted to `oauth_clients` *(PR #3)*
+- [x] C2.9 Callback allowlist: claude.ai AND claude.com (distinct hosts); ChatGPT's callback arrives in its CIMD doc *(PR #3)*
+- [ ] C2.10 Rate limits: writes 60/min, `use_api` 30/min per connection (§13) — **deferred to M2 hardening follow-up**
 - [x] C2.11 Revocation: `revoke_connection` (idempotent) — authenticate fails immediately after; revoked indistinguishable from unknown *(PR #2)*
 
 ## C3 — Memory (M1–M2)
@@ -95,13 +95,15 @@ Order chosen by which client each mode unblocks (§9), not by spec elegance.
 
 ## C4 — MCP gateway & tools (M2 core)
 
-- [ ] C4.1 MCP server, Streamable HTTP transport (`transport="http"`); connection→workspace scoping on every call. **Stateless by design** — spec 2026-07-28 removes sessions; never depend on `Mcp-Session-Id`, `ctx.sample()`, or `ctx.list_roots()`
-- [ ] C4.2 Structured errors: `UNAUTHORIZED_SCOPE`, `NOT_FOUND`, `RATE_LIMITED`, `HOST_NOT_ALLOWED`, `PAYLOAD_TOO_LARGE`
-- [ ] C4.3 Memory tools ×5: `search_memory`, `add_memory` (≤4 KB, kind, initiated_by), `list_memories` (cursor), `update_memory`, `delete_memory`
+- [x] C4.1 MCP server, Streamable HTTP (`transport="http"`, `stateless_http=True`); workspace resolved only from the verified token, never a tool arg *(PR #3)*
+- [x] C4.2 Structured errors: `UNAUTHORIZED_SCOPE`, `NOT_FOUND`, `PAYLOAD_TOO_LARGE`, etc. via `ToolError` envelope surviving masking *(PR #3)*
+- [x] C4.3 Memory tools ×5: `search_memory`, `add_memory`, `list_memories`, `update_memory`, `delete_memory` — wrap `purse.memory.service` *(PR #3)*
 - [ ] C4.4 Skills tools ×3: `list_skills`, `get_skill` (name, version?), `upsert_skill` (M3, with C5)
 - [ ] C4.5 API tools ×3: `list_apis`, `get_api_ref` (M4), `use_api` (M5, with C6)
-- [ ] C4.6 Contract tests: every tool × every error code × scope denial
-- [ ] C4.7 `initiated_by` recorded as claim; connection_id as the trusted provenance (§10)
+- [x] C4.6 Contract tests: tools × error codes × scope denial; no tool exposes `workspace_id`/`connection_id` *(PR #3)*
+- [x] C4.7 `initiated_by` recorded as claim; `connection_id` from the token is the trusted provenance; MCP `agent_id` is always `None` (no trustworthy per-call identity) *(PR #3)*
+
+> **▶ Milestone M2 (Cross-tool recall) in progress** — PR #3 landed the MCP gateway (C4) + OAuth 2.1 AS (C2.3–2.9) as one deployable app: `/mcp` (Streamable HTTP, all six auth modes), OAuth discovery at root with the CIMD anti-downgrade gate, `/v1` REST, verified vs real Postgres (451 tests) and a boot smoke test. **Remaining for M2:** staging deploy (Fly config ready, `docs/deploy-fly.md`), client verification C8.1–8.4, and the deferred C2.10 rate limits.
 
 ## C5 — Skills (M3)
 
