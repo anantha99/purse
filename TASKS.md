@@ -88,7 +88,7 @@ Order chosen by which client each mode unblocks (§9), not by spec elegance.
 - [ ] C3.4b **Mem0 ranking verification test (do FIRST, ~1 hr):** open issue #6883 — pgvector returns cosine *distance* but `score_and_rank` treats it as *similarity*, inverting rankings. Seed 50 memories, verify top-k is actually nearest. If broken: patch/workaround or lean on our own pgvector fallback (C3.5) for ranking
 - [ ] C3.5 Semantic search: pgvector fallback + Mem0 recall, ranked results with provenance
 - [ ] C3.6 Index rebuild command: drop + replay canonical log (proves "derived, droppable" §3.1–2)
-- [ ] C3.7 **`purse-save-policy` skill** — the save-skill as a versioned artifact in-repo; wording iterated via its own issues (§8.2, product surface)
+- [x] C3.7 **`purse-save-policy` skill** — versioned artifact `purse/skills/seeds/purse-save-policy.md`; seeded into new vaults; iterate wording via its own issues (§8.2, product surface) *(PR #6)*
 - [x] C3.8 REST `/v1/memories` CRUD + search, PRD-shaped structured errors, `X-Purse-Agent` per-call claim; `purse/gateway/app.py` wires real PAT auth *(PR #2)*
 
 > **✅ Milestone M1 (Spine) complete** — PR #1 (data layer) + PR #2 (PAT auth, memory core, REST, end-to-end wiring). A minted PAT can `curl` a fact into the vault and search it back over authenticated HTTP; every write is provenanced and audited; revoked==unknown; 393 tests green vs real Postgres in CI. Remaining C3 items (Mem0 adapter C3.4–3.6, save-policy skill C3.7) are M2/M3 work.
@@ -98,7 +98,7 @@ Order chosen by which client each mode unblocks (§9), not by spec elegance.
 - [x] C4.1 MCP server, Streamable HTTP (`transport="http"`, `stateless_http=True`); workspace resolved only from the verified token, never a tool arg *(PR #3)*
 - [x] C4.2 Structured errors: `UNAUTHORIZED_SCOPE`, `NOT_FOUND`, `PAYLOAD_TOO_LARGE`, etc. via `ToolError` envelope surviving masking *(PR #3)*
 - [x] C4.3 Memory tools ×5: `search_memory`, `add_memory`, `list_memories`, `update_memory`, `delete_memory` — wrap `purse.memory.service` *(PR #3)*
-- [ ] C4.4 Skills tools ×3: `list_skills`, `get_skill` (name, version?), `upsert_skill` (M3, with C5)
+- [x] C4.4 Skills tools ×3: `list_skills`, `get_skill` (name, version?), `upsert_skill` — done with C5 *(PR #6)*
 - [ ] C4.5 API tools ×3: `list_apis`, `get_api_ref` (M4), `use_api` (M5, with C6)
 - [x] C4.6 Contract tests: tools × error codes × scope denial; no tool exposes `workspace_id`/`connection_id` *(PR #3)*
 - [x] C4.7 `initiated_by` recorded as claim; `connection_id` from the token is the trusted provenance; MCP `agent_id` is always `None` (no trustworthy per-call identity) *(PR #3)*
@@ -107,10 +107,10 @@ Order chosen by which client each mode unblocks (§9), not by spec elegance.
 
 ## C5 — Skills (M3)
 
-- [ ] C5.1 Markdown + frontmatter parse/validate (name, description, semver version, updated_at)
-- [ ] C5.2 Content-addressed versions; name → latest via `skill_heads`; history fetchable; ≤64 KB inline
-- [ ] C5.3 `upsert_skill` version-bump semantics + MCP tools wired (C4.4)
-- [ ] C5.4 Seed skills: `purse-save-policy` (from C3.7) preloaded in new vaults
+- [x] C5.1 Markdown + YAML frontmatter parse/validate (kebab name, description, strict semver, updated_at); ≤64 KB UTF-8 *bytes* *(PR #6)*
+- [x] C5.2 Content-addressed (sha256) versions; name → latest via `skill_heads` (most-recent-write head pointer); versions fetchable; workspace-isolated *(PR #6)*
+- [x] C5.3 `upsert_skill`: idempotent same-content, version-collision rejected (bump required); MCP tools `list_skills`/`get_skill`/`upsert_skill` (**C4.4**) + REST `/v1/skills`. **Verified live on staging** *(PR #6)*
+- [x] C5.4 Seed `purse-save-policy` (C3.7) preloaded into new vaults via `seed_default_skills` wired into bootstrap; idempotent; ships in the wheel *(PR #6)*
 
 ## C6 — Secrets & proxy (M4 store → M5 executor)
 
