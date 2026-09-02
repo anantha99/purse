@@ -37,19 +37,27 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    restart: "no"
+    restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
     environment:
-      # Placeholder wiring. The gateway (C4) replaces the command below; these
-      # values are read from the environment and never hardcoded here.
+      # All read from the environment; never hardcoded here.
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in .env}
-      PURSE_BASE_URL: ${PURSE_BASE_URL:-http://localhost:8000}
+      # Public base URL clients reach this instance on (OAuth issuer/discovery).
+      PURSE_PUBLIC_URL: ${PURSE_PUBLIC_URL:-http://localhost:8080}
+      # Signing key for the OAuth consent flow. Required to serve the gateway.
+      PURSE_OAUTH_SECRET: ${PURSE_OAUTH_SECRET:?set PURSE_OAUTH_SECRET in .env}
       PURSE_LOG_LEVEL: ${PURSE_LOG_LEVEL:-info}
-    # Placeholder until the MCP gateway exists — proves the image builds and the
-    # package imports inside the container.
-    command: ["python", "-c", "import purse; print(purse.__version__)"]
+      PORT: "8080"
+    ports:
+      - "${PURSE_PORT:-8080}:8080"
+    # The Dockerfile CMD serves uvicorn purse.gateway.serve:app; migrations are
+    # applied first so a fresh volume comes up ready.
+    command:
+      - sh
+      - -c
+      - "alembic upgrade head && uvicorn purse.gateway.serve:app --host 0.0.0.0 --port 8080"
 
 volumes:
   purse-db-data:
