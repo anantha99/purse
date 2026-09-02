@@ -53,15 +53,15 @@
 
 ## C1 — Data layer (M1)
 
-- [ ] C1.1 Migration tooling + baseline schema: `users`, `workspaces`
-- [ ] C1.2 `connections` (auth_mode, scopes[], writes_enabled, token_hash, revoked_at) + `oauth_clients` (dcr|cimd|static, jsonb metadata)
-- [ ] C1.3 `memories` append-only: content, kind, embedding (pgvector), supersedes, tombstone, connection_id, agent_id, initiated_by — **no UPDATE/DELETE paths in code, enforced by DB grants**
-- [ ] C1.4 "Current memory" materialized view (not tombstoned, not superseded) + refresh strategy
-- [ ] C1.5 `skills` + `skill_heads` (unique workspace+name+version, content_hash)
-- [ ] C1.6 `apis` (base_url, auth_style, allowed_hosts[], key_ciphertext, dek_wrapped, rotated_at)
-- [ ] C1.7 `audit_log` — names/IDs only for secret-touching actions
-- [ ] C1.8 Workspace isolation: every query workspace-scoped; test asserting no cross-workspace leakage
-- [ ] C1.9 Vault export: full JSON (memories + provenance, skills + history, API *names* only), documented schema, no gating (§8.1)
+- [x] C1.1 Migration tooling (Alembic, env-var-only URL) + baseline schema: `users`, `workspaces`
+- [x] C1.2 `connections` (auth_mode, scopes[], writes_enabled, token_hash, revoked_at) + `oauth_clients` (dcr|cimd|static, jsonb metadata)
+- [x] C1.3 `memories` append-only — enforced by DB **triggers** (whole-row jsonb diff; future columns immutable by default): only tombstone false→true and `embedding` (derived, rebuildable) may change; DELETE/TRUNCATE rejected; hard erase = documented operator-only compliance path
+- [x] C1.4 "Current memory" as plain VIEW (deviation from "materialized" — correctness first, no refresh staleness; revisit when write volume justifies). Chains die at a tombstoned head — no resurrection of superseded rows
+- [x] C1.5 `skills` + `skill_heads` (unique workspace+name+version, content_hash)
+- [x] C1.6 `apis` (base_url, auth_style, allowed_hosts[], key_ciphertext, dek_wrapped, rotated_at)
+- [x] C1.7 `audit_log` — names/IDs only for secret-touching actions
+- [x] C1.8 Workspace isolation: workspace-bound `Repo` layer (no public method takes workspace_id — enforced by reflection test); cross-workspace supersession structurally impossible via composite FK; leak tests across two workspaces
+- [x] C1.9 Vault export: full JSON (memories + provenance incl. superseded/tombstoned history, skills all versions, API *names* only), documented schema in `docs/export-schema.md`; import-time guard forces exported/never-exported classification of new columns — *(all verified in CI: 113 tests vs real pgvector Postgres, 0 skipped; PR #1)*
 
 ## C2 — Auth & Connect (M1: PAT → M3: all six modes)
 
