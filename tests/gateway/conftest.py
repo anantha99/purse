@@ -144,6 +144,10 @@ class DbGateway:
     ) -> TestClient:
         return self.build(engine=engine, granted=granted)
 
+    def client_with_limiter(self, limiter: object) -> TestClient:
+        """A client whose write endpoints enforce *limiter* (C2.10)."""
+        return self.build(limiter=limiter)
+
 
 @pytest.fixture
 def db_gateway(migrated_engine: Engine) -> Iterator[DbGateway]:
@@ -172,19 +176,30 @@ def db_gateway(migrated_engine: Engine) -> Iterator[DbGateway]:
         # connection can see the workspace. The outer transaction still holds.
         setup.commit()
 
-    def build(*, engine: MemoryEngine | None = None, granted: set[str] | None = None) -> TestClient:
+    def build(
+        *,
+        engine: MemoryEngine | None = None,
+        granted: set[str] | None = None,
+        limiter: object | None = None,
+    ) -> TestClient:
         index = engine if engine is not None else NullEngine()
         authenticate = fake_authenticate(ctx)
         # `granted=None` builds the app the way it is built before C2 lands:
         # `require_scope` not passed at all, i.e. the permissive default.
         if granted is None:
-            app = create_app(session_factory=make_session, engine=index, authenticate=authenticate)
+            app = create_app(
+                session_factory=make_session,
+                engine=index,
+                authenticate=authenticate,
+                limiter=limiter,  # type: ignore[arg-type]
+            )
         else:
             app = create_app(
                 session_factory=make_session,
                 engine=index,
                 authenticate=authenticate,
                 require_scope=scope_enforcer(granted),
+                limiter=limiter,  # type: ignore[arg-type]
             )
         return TestClient(app)
 
@@ -280,6 +295,10 @@ class MCPDbVault:
     session_factory: Callable[[], Session]
     build: Callable[..., FastMCP]
 
+    def build_with_limiter(self, limiter: object) -> FastMCP:
+        """An MCP server whose write tools enforce *limiter* (C2.10)."""
+        return self.build(limiter=limiter)
+
 
 @pytest.fixture
 def mcp_db(migrated_engine: Engine) -> Iterator[MCPDbVault]:
@@ -310,6 +329,7 @@ def mcp_db(migrated_engine: Engine) -> Iterator[MCPDbVault]:
         scopes: Collection[str] = ("memory:read", "memory:write"),
         writes_enabled: bool = True,
         engine: MemoryEngine | None = None,
+        limiter: object | None = None,
     ) -> FastMCP:
         verifier = FakeMCPVerifier(
             connection_id=connection_id,
@@ -321,6 +341,7 @@ def mcp_db(migrated_engine: Engine) -> Iterator[MCPDbVault]:
             session_factory=make_session,
             engine=engine if engine is not None else NullEngine(),
             auth=verifier,
+            limiter=limiter,  # type: ignore[arg-type]
         )
 
     try:

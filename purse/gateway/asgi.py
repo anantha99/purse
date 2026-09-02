@@ -30,6 +30,7 @@ from purse.auth.oauth import (
 from purse.db.session import create_db_engine, session_factory, session_scope
 from purse.gateway.app import create_default_app
 from purse.gateway.mcp import create_mcp_http_app, create_mcp_server
+from purse.gateway.ratelimit import RateLimiter
 from purse.memory.engine import MemoryEngine, NullEngine
 
 __all__ = ["create_purse_app", "create_purse_app_from_env"]
@@ -44,6 +45,7 @@ def create_purse_app(
     memory_engine: MemoryEngine | None = None,
     static_clients: Sequence[StaticClient] = (),
     mcp_path: str = "/mcp",
+    limiter: RateLimiter | None = None,
 ) -> Starlette:
     """Assemble the whole gateway.
 
@@ -53,11 +55,20 @@ def create_purse_app(
     ``localhost``). *secret* signs the consent flow's pending-authorization
     tokens. *engine*/*memory_engine* are injectable for tests; production passes
     neither and gets a Postgres engine from *database_url*/``DATABASE_URL`` and a
-    :class:`NullEngine` (the Mem0 adapter arrives in C3.4).
+    :class:`NullEngine` (the Mem0 adapter arrives in C3.4). *limiter* is the
+    shared per-connection write limiter (PRD §13, C2.10); production passes none
+    and gets the default 60/min limiter, while a test may inject a small one to
+    prove the MCP and REST surfaces share one budget.
     """
     db_engine = engine if engine is not None else create_db_engine(database_url)
     make_session = session_factory(db_engine)
     index = memory_engine if memory_engine is not None else NullEngine()
+
+    # ONE limiter, shared by both surfaces (PRD §13, C2.10): the token bucket is
+    # keyed by connection_id, so a connection's 60 writes/min budget is the same
+    # whether it writes over MCP or REST. A test may inject a small one to prove
+    # the shared budget; production builds the default 60/min limiter.
+    write_limiter = limiter if limiter is not None else RateLimiter()
 
     auth = build_purse_auth(
         base_url=public_url,
@@ -66,7 +77,9 @@ def create_purse_app(
         static_clients=static_clients,
     )
 
-    server = create_mcp_server(session_factory=make_session, engine=index, auth=auth)
+    server = create_mcp_server(
+        session_factory=make_session, engine=index, auth=auth, limiter=write_limiter
+    )
     # The MCP HTTP app is a Starlette app carrying the OAuth AS routes at its root
     # plus the streamable MCP endpoint at *mcp_path*, and — critically — its own
     # lifespan (the stateless session manager), which uvicorn/TestClient must run.
@@ -77,7 +90,7 @@ def create_purse_app(
     # ``/v1/...`` paths and its own FastAPI error handlers, so it is mounted with an
     # empty prefix (nothing stripped) and appended LAST — the MCP and OAuth routes
     # above match first, and only what they don't claim falls through to REST.
-    rest_app = create_default_app(make_session=make_session, engine=index)
+    rest_app = create_default_app(make_session=make_session, engine=index, limiter=write_limiter)
     app.router.routes.append(Mount("", app=rest_app))
 
     return app

@@ -19,7 +19,7 @@ different spelling, change it here — this is the only place it is written.
 
 from __future__ import annotations
 
-__all__ = ["GatewayError", "ScopeError", "UnauthorizedError"]
+__all__ = ["GatewayError", "RateLimitedError", "ScopeError", "UnauthorizedError"]
 
 
 class GatewayError(Exception):
@@ -56,3 +56,19 @@ class ScopeError(GatewayError):
 
     code = "UNAUTHORIZED_SCOPE"
     status = 403
+
+
+class RateLimitedError(GatewayError):
+    """The connection exceeded its per-connection write budget (PRD §13, C2.10).
+
+    ``retry_after`` is the seconds until the caller could retry, surfaced as an
+    HTTP ``Retry-After`` header (rounded up) by the REST error handler. It is
+    ``None`` only when a caller constructs the error without one.
+    """
+
+    code = "RATE_LIMITED"
+    status = 429
+
+    def __init__(self, message: str, *, retry_after: float | None = None) -> None:
+        super().__init__(message)
+        self.retry_after = retry_after
