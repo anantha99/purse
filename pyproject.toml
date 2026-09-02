@@ -20,6 +20,10 @@ classifiers = [
 dependencies = [
     # Migrations.
     "alembic>=1.14",
+    # REST gateway (C3.8) — the pre-MCP smoke path. Deliberately NO uvicorn:
+    # this package ships an ASGI app, not a server. Serving it (uvicorn/gunicorn,
+    # compose entrypoint) lands with C4/C9 self-hosting.
+    "fastapi>=0.141.1",
     # pgvector's SQLAlchemy type. The extension itself comes from the
     # pgvector/pgvector:pg17 image.
     "pgvector>=0.3.6",
@@ -34,6 +38,11 @@ dev = [
     "ruff>=0.9",
     "mypy>=1.14",
     "pytest>=8.3",
+    # Starlette's TestClient is HTTP-client-backed and ships no client of its
+    # own; this is the only reason it is here. httpx **2**, not httpx: starlette
+    # 1.6 emits a StarletteDeprecationWarning when it falls back to httpx 0.x,
+    # and a deprecation warning in a green test run is a warning nobody reads.
+    "httpx2>=2.12.0",
 ]
 
 [build-system]

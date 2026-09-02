@@ -121,7 +121,12 @@ def test_get_memory_from_the_wrong_workspace_returns_nothing(
 def test_tombstoning_another_workspaces_memory_is_a_no_op(
     session: Session, populated: TwoWorkspaces
 ) -> None:
-    beta_memory = populated.beta.list_memories()[0]
+    # A *live* memory, deterministically: list_memories() returns the full log
+    # incl. the tombstoned row, and every populated row shares a created_at
+    # (one transaction), so list_memories()[0] tiebreaks on a random uuid and
+    # can hand back the already-tombstoned memory. The current view excludes it.
+    beta_memory = populated.beta.current_memories()[0]
+    assert beta_memory.tombstone is False
     assert populated.alpha.tombstone_memory(beta_memory.id) is False
     session.flush()
     still_live = populated.beta.get_memory(beta_memory.id)
