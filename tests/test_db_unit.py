@@ -81,6 +81,7 @@ def test_the_migration_chain_is_linear_and_complete() -> None:
     scripts = ScriptDirectory.from_config(alembic_config("postgresql://u:p@h/db"))
     revisions = [script.revision for script in scripts.walk_revisions()]
     assert revisions == [
+        "c1_8_audit_seq",
         "c1_7_audit_log",
         "c1_6_apis",
         "c1_5_skills",

@@ -109,13 +109,12 @@ def test_memory_indexes_exist_including_an_hnsw_vector_index(session: Session) -
     assert "vector_cosine_ops" in hnsw
 
 
-def test_audit_log_index_is_descending(session: Session) -> None:
+def test_audit_log_index_is_descending_on_seq(session: Session) -> None:
     definition = session.execute(
-        text(
-            "SELECT indexdef FROM pg_indexes WHERE indexname = 'ix_audit_log_workspace_id_created_at'"
-        )
+        text("SELECT indexdef FROM pg_indexes WHERE indexname = 'ix_audit_log_workspace_id_seq'")
     ).scalar_one()
-    assert "DESC" in definition
+    assert "seq DESC" in definition
+    assert "UNIQUE" in definition
 
 
 @pytest.mark.parametrize(

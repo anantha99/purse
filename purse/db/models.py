@@ -27,11 +27,13 @@ from typing import Any
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
     ForeignKeyConstraint,
+    Identity,
     Index,
     LargeBinary,
     MetaData,
@@ -462,13 +464,19 @@ class AuditLogEntry(Base):
     __tablename__ = "audit_log"
     __table_args__ = (
         Index(
-            "ix_audit_log_workspace_id_created_at",
+            "ix_audit_log_workspace_id_seq",
             "workspace_id",
-            text("created_at DESC"),
+            text("seq DESC"),
+            unique=True,
         ),
     )
 
     id: Mapped[uuid.UUID] = _uuid_pk()
+    # Strictly monotonic insertion order. created_at defaults to now(), which is
+    # transaction time — rows written in one transaction share a timestamp, so
+    # "newest first" MUST order by seq, never by (created_at, id): id is a
+    # random uuid and turns equal-timestamp ordering into a coin flip.
+    seq: Mapped[int] = mapped_column(BigInteger, Identity(always=True), nullable=False)
     workspace_id: Mapped[uuid.UUID] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey(

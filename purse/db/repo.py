@@ -508,7 +508,7 @@ class Repo:
         stmt = (
             select(AuditLogEntry)
             .where(AuditLogEntry.workspace_id == self._workspace_id)
-            .order_by(AuditLogEntry.created_at.desc(), AuditLogEntry.id.desc())
+            .order_by(AuditLogEntry.seq.desc())
             .limit(limit)
         )
         return list(self._session.scalars(stmt))
