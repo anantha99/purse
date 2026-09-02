@@ -104,12 +104,16 @@ from purse.gateway.ratelimit import RateLimiter, RateLimitExceeded
 from purse.memory import service
 from purse.memory.engine import MemoryEngine
 from purse.memory.errors import MemoryError_
+from purse.skills import service as skills_service
+from purse.skills.errors import SkillError
 
 __all__ = [
     "AGENT_HEADER",
     "MAX_AGENT_ID_LENGTH",
     "MEMORY_READ",
     "MEMORY_WRITE",
+    "SKILLS_READ",
+    "SKILLS_WRITE",
     "Authenticate",
     "GatewayContext",
     "RequestContext",
@@ -119,6 +123,8 @@ __all__ = [
 
 MEMORY_READ = "memory:read"
 MEMORY_WRITE = "memory:write"
+SKILLS_READ = "skills:read"
+SKILLS_WRITE = "skills:write"
 
 _STATUS_BY_CODE = {
     "NOT_FOUND": 404,
@@ -266,6 +272,17 @@ class UpdateMemoryRequest(_StrictModel):
     content: str
 
 
+class UpsertSkillRequest(_StrictModel):
+    """``PUT /v1/skills/{name}`` (PRD §10 ``upsert_skill``).
+
+    The body carries only the raw markdown document; ``name``, ``description``,
+    and ``version`` are parsed from its YAML frontmatter by the skills service,
+    and the frontmatter ``name`` must match the path.
+    """
+
+    content: str
+
+
 # ---------------------------------------------------------------------------
 # App factory
 # ---------------------------------------------------------------------------
@@ -393,6 +410,12 @@ def create_app(
         error = cast(MemoryError_, exc)
         return _error_response(_STATUS_BY_CODE.get(error.code, 400), error.code, error.message)
 
+    async def on_skill_error(request: Request, exc: Exception) -> JSONResponse:
+        # Skills errors carry the same wire codes as memory errors, so the same
+        # code→status table applies.
+        error = cast(SkillError, exc)
+        return _error_response(_STATUS_BY_CODE.get(error.code, 400), error.code, error.message)
+
     async def on_request_validation_error(request: Request, exc: Exception) -> JSONResponse:
         # pydantic's own error body is a different shape from PRD §10's, and a
         # client should not have to parse two.
@@ -405,6 +428,7 @@ def create_app(
 
     app.add_exception_handler(GatewayError, on_gateway_error)
     app.add_exception_handler(MemoryError_, on_memory_error)
+    app.add_exception_handler(SkillError, on_skill_error)
     app.add_exception_handler(RequestValidationError, on_request_validation_error)
 
     # -- endpoints ----------------------------------------------------------
@@ -469,5 +493,28 @@ def create_app(
         # 200 with a body, not 204: the tombstone is idempotent, and echoing the
         # id back is what makes a retry legible in a client's logs.
         return {"id": str(memory_id), "deleted": True}
+
+    # -- skills endpoints (C5.3, smoke parity with the MCP tools) -----------
+
+    @app.get("/v1/skills")
+    def list_skills(ctx: Ctx, session: Db) -> dict[str, Any]:
+        require_scope(ctx.caller, SKILLS_READ)
+        summaries = skills_service.list_skills(session, ctx)
+        return {"skills": [summary.as_dict() for summary in summaries]}
+
+    @app.get("/v1/skills/{name}")
+    def get_skill(
+        name: str, ctx: Ctx, session: Db, version: Annotated[str | None, Query()] = None
+    ) -> dict[str, Any]:
+        require_scope(ctx.caller, SKILLS_READ)
+        record = skills_service.get_skill(session, ctx, name=name, version=version)
+        return record.as_dict()
+
+    @app.put("/v1/skills/{name}")
+    def upsert_skill(name: str, body: UpsertSkillRequest, ctx: Ctx, session: Db) -> dict[str, Any]:
+        require_scope(ctx.caller, SKILLS_WRITE)
+        _limit_write(limiter, ctx)
+        record = skills_service.upsert_skill(session, ctx, name=name, content=body.content)
+        return {"name": record.name, "version": record.version}
 
     return app

@@ -1,9 +1,9 @@
 """The MCP gateway: Purse's real public surface (C4.1-C4.3, C4.6-C4.7; PRD §10, §12).
 
 The REST app (:mod:`purse.gateway.rest`) was the M1 smoke path. This module is
-the product's front door — a FastMCP server exposing the five memory tools over
-Streamable HTTP, workspace-scoped by the authenticated connection, with the
-structured error envelope PRD §10 fixes.
+the product's front door — a FastMCP server exposing the five memory tools and
+the three skills tools over Streamable HTTP, workspace-scoped by the authenticated
+connection, with the structured error envelope PRD §10 fixes.
 
 .. rubric:: Stateless by design
 
@@ -64,6 +64,8 @@ from purse.memory import service
 from purse.memory.engine import MemoryEngine
 from purse.memory.errors import MemoryError_
 from purse.memory.records import SearchHit
+from purse.skills import service as skills_service
+from purse.skills.errors import SkillError
 
 __all__ = [
     "MCPErrorCode",
@@ -259,16 +261,17 @@ def _unit_of_work(session_factory: Callable[[], Session]) -> Iterator[Session]:
 def _mapped_errors() -> Iterator[None]:
     """Translate service errors into the §10 envelope; pass §10 errors through.
 
-    The memory service's error codes (``NOT_FOUND``, ``PAYLOAD_TOO_LARGE``,
-    ``VALIDATION``) are already the wire codes, so the mapping is a pass-through
-    of ``exc.code``. An :class:`MCPToolError` raised upstream (scope denial,
-    ``UNAUTHENTICATED``) is re-raised unchanged.
+    The memory and skills services raise error codes (``NOT_FOUND``,
+    ``PAYLOAD_TOO_LARGE``, ``VALIDATION``) that are already the wire codes, so the
+    mapping is a pass-through of ``exc.code`` for either hierarchy — both expose
+    the same ``.code`` / ``.message`` pair. An :class:`MCPToolError` raised
+    upstream (scope denial, ``UNAUTHENTICATED``) is re-raised unchanged.
     """
     try:
         yield
     except MCPToolError:
         raise
-    except MemoryError_ as exc:
+    except (MemoryError_, SkillError) as exc:
         raise MCPToolError(exc.code, exc.message) from exc
 
 
@@ -285,7 +288,7 @@ def create_mcp_server(
     limiter: RateLimiter | None = None,
     name: str = "Purse",
 ) -> FastMCP:
-    """Build the FastMCP server with the five memory tools (C4.1-C4.3).
+    """Build the FastMCP server with the five memory tools and three skills tools.
 
     :param session_factory: Called once per tool call; the session is committed
         on success and rolled back on any error.
@@ -404,6 +407,54 @@ def create_mcp_server(
         with _mapped_errors(), _unit_of_work(session_factory) as session:
             service.delete_memory(session, ctx, memory_id=memory_id)
             return {"id": str(memory_id), "deleted": True}
+
+    # -- skills tools (C4.4 / C5.3) -----------------------------------------
+
+    @mcp.tool
+    def list_skills() -> dict[str, Any]:
+        """List this workspace's skills — the latest version of each.
+
+        Returns ``{skills: [{name, description, version}]}``. Scope: ``skills:read``.
+        """
+        caller = _resolve_caller()
+        _require(caller, Scope.SKILLS_READ)
+        ctx = _ToolContext(caller=caller)
+        with _mapped_errors(), _unit_of_work(session_factory) as session:
+            summaries = skills_service.list_skills(session, ctx)
+            return {"skills": [summary.as_dict() for summary in summaries]}
+
+    @mcp.tool
+    def get_skill(name: str, version: str | None = None) -> dict[str, Any]:
+        """Fetch a skill's frontmatter and body.
+
+        ``version`` defaults to the latest; a specific version fetches that one.
+        An unknown skill or version is ``NOT_FOUND``. Returns the skill's
+        frontmatter and markdown body. Scope: ``skills:read``.
+        """
+        caller = _resolve_caller()
+        _require(caller, Scope.SKILLS_READ)
+        ctx = _ToolContext(caller=caller)
+        with _mapped_errors(), _unit_of_work(session_factory) as session:
+            record = skills_service.get_skill(session, ctx, name=name, version=version)
+            return record.as_dict()
+
+    @mcp.tool
+    def upsert_skill(name: str, content: str) -> dict[str, Any]:
+        """Create or update a skill from a markdown document with YAML frontmatter.
+
+        The frontmatter ``name`` must equal *name*. Re-upserting an existing
+        version with identical content is a no-op; the same version with different
+        content is rejected (``VALIDATION``) — bump the version. Documents are
+        capped at 64 KB (``PAYLOAD_TOO_LARGE`` beyond that). Returns
+        ``{name, version}``. Scope: ``skills:write``.
+        """
+        caller = _resolve_caller()
+        _require(caller, Scope.SKILLS_WRITE)
+        _limit_write(limiter, caller)
+        ctx = _ToolContext(caller=caller)
+        with _mapped_errors(), _unit_of_work(session_factory) as session:
+            record = skills_service.upsert_skill(session, ctx, name=name, content=content)
+            return {"name": record.name, "version": record.version}
 
     return mcp
 

@@ -69,7 +69,9 @@ def test_all_five_memory_tools_registered() -> None:
         async with Client(server) as client:
             return {tool.name for tool in await client.list_tools()}
 
-    assert anyio.run(body) == TOOL_NAMES
+    # The five memory tools are all registered. Skills tools (C4.4) are registered
+    # alongside them and are asserted exhaustively in ``test_mcp_skills.py``.
+    assert anyio.run(body) >= TOOL_NAMES
 
 
 @pytest.mark.parametrize("tool_name", sorted(TOOL_NAMES))

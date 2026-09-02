@@ -34,6 +34,7 @@ from purse.db.config import DatabaseUrlError
 from purse.db.models import User, Workspace
 from purse.db.repo import create_user, create_workspace, list_user_workspaces
 from purse.db.session import create_db_engine, session_scope
+from purse.skills import seed_default_skills
 
 __all__ = [
     "DEFAULT_USER_EMAIL",
@@ -134,6 +135,11 @@ def bootstrap(
         scopes=ONBOARDING_SCOPES,
         writes_enabled=True,
     )
+    # Preload the bundled skills (the save-policy that tells agents what's worth
+    # remembering). Idempotent across reboots, so re-running bootstrap is safe.
+    # A server-side seed, not a scoped client write — attributed to the onboarding
+    # connection for provenance.
+    seed_default_skills(session, workspace_id=workspace.id, connection_id=connection.id)
     return BootstrapResult(
         user_id=user.id,
         email=user.email,
