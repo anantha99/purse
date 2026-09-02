@@ -22,7 +22,7 @@ Two flavours of app, because two different things are being tested.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Collection, Iterator
 from dataclasses import dataclass
 
 import pytest
@@ -204,3 +204,132 @@ def db_client(db_gateway: DbGateway) -> Iterator[TestClient]:
 @pytest.fixture
 def auth_headers() -> dict[str, str]:
     return {"Authorization": f"Bearer {GOOD_TOKEN}"}
+
+
+# ---------------------------------------------------------------------------
+# MCP gateway (C4)
+# ---------------------------------------------------------------------------
+#
+# Appended for the MCP surface. The MCP tools read the caller's identity from a
+# *verified token* (FastMCP's `get_access_token()`), not from an injected
+# `authenticate` hook — so the stand-in for C2 here is a `TokenVerifier` that
+# returns chosen claims for a chosen token, exactly as the parallel OAuth agent's
+# real provider will. Nothing imports the OAuth server.
+
+from fastmcp import FastMCP  # noqa: E402
+from fastmcp.server.auth import AccessToken, TokenVerifier  # noqa: E402
+
+from purse.auth.oauth.claims import build_access_token  # noqa: E402
+from purse.gateway.mcp import create_mcp_server  # noqa: E402
+
+#: The one bearer token the fake verifier accepts over the HTTP transport.
+MCP_GOOD_TOKEN = "purse_mcp_test_token"  # noqa: S105 - a fixture constant, not a credential
+
+
+class FakeMCPVerifier(TokenVerifier):
+    """A `TokenVerifier` that mints one connection's verified claims for one token.
+
+    Stands in for the OAuth agent's `OAuthProvider` without importing it: the MCP
+    server only needs *an* `AuthProvider` whose `verify_token` yields an
+    `AccessToken` whose `scopes` are the granted scopes and whose `claims` carry
+    the Purse connection identity. That is the whole seam.
+    """
+
+    def __init__(
+        self,
+        *,
+        connection_id: uuid.UUID,
+        workspace_id: uuid.UUID,
+        scopes: Collection[str] = ("memory:read", "memory:write"),
+        writes_enabled: bool = True,
+        client_name: str = "pytest-mcp",
+        token: str = MCP_GOOD_TOKEN,
+    ) -> None:
+        super().__init__()
+        self._token = token
+        # Mint through the same builder the real OAuth provider and PAT verifier
+        # use, so the fake exercises the exact claim shape (namespaced keys) the
+        # tool layer reads — the seam is tested, not a parallel invention.
+        self._access = build_access_token(
+            token=token,
+            connection_id=connection_id,
+            workspace_id=workspace_id,
+            scopes=[str(scope) for scope in scopes],
+            writes_enabled=writes_enabled,
+            client_name=client_name,
+        )
+
+    async def verify_token(self, token: str) -> AccessToken | None:
+        if token != self._token:
+            return None
+        return self._access
+
+
+@dataclass
+class MCPDbVault:
+    """A real workspace + connection, and a builder for MCP servers bound to it.
+
+    Mirrors :class:`DbGateway` for the MCP surface: ``build`` returns a
+    ``create_mcp_server`` whose fake verifier authenticates :data:`MCP_GOOD_TOKEN`
+    as this connection, sharing the app's request sessions with the test's outer
+    rollback transaction (savepoint-per-commit).
+    """
+
+    connection_id: uuid.UUID
+    workspace_id: uuid.UUID
+    session_factory: Callable[[], Session]
+    build: Callable[..., FastMCP]
+
+
+@pytest.fixture
+def mcp_db(migrated_engine: Engine) -> Iterator[MCPDbVault]:
+    connection = migrated_engine.connect()
+    transaction = connection.begin()
+
+    def make_session() -> Session:
+        return Session(
+            bind=connection, expire_on_commit=False, join_transaction_mode="create_savepoint"
+        )
+
+    with make_session() as setup:
+        user = create_user(setup, email=f"mcp-{uuid.uuid4().hex[:10]}@example.test")
+        workspace = create_workspace(setup, user_id=user.id, name="Personal")
+        repo = Repo.open(setup, workspace.id)
+        connection_row = repo.add_connection(
+            client_name="mcp-client",
+            auth_mode=AuthMode.PAT,
+            scopes=["memory:read", "memory:write"],
+            writes_enabled=True,
+        )
+        connection_id = connection_row.id
+        workspace_id = workspace.id
+        setup.commit()
+
+    def build(
+        *,
+        scopes: Collection[str] = ("memory:read", "memory:write"),
+        writes_enabled: bool = True,
+        engine: MemoryEngine | None = None,
+    ) -> FastMCP:
+        verifier = FakeMCPVerifier(
+            connection_id=connection_id,
+            workspace_id=workspace_id,
+            scopes=scopes,
+            writes_enabled=writes_enabled,
+        )
+        return create_mcp_server(
+            session_factory=make_session,
+            engine=engine if engine is not None else NullEngine(),
+            auth=verifier,
+        )
+
+    try:
+        yield MCPDbVault(
+            connection_id=connection_id,
+            workspace_id=workspace_id,
+            session_factory=make_session,
+            build=build,
+        )
+    finally:
+        transaction.rollback()
+        connection.close()

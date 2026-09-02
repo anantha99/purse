@@ -1,0 +1,32 @@
+# Fly.io deployment for a Purse staging / self-host instance.
+#
+# This file is a template — `fly launch` will fill in `app` and `primary_region`,
+# or edit them here before first deploy. Nothing secret lives in this file:
+# DATABASE_URL, PURSE_OAUTH_SECRET, and the Postgres password are set with
+# `fly secrets set ...` (see docs/deploy-fly.md), never committed.
+
+app = "purse-staging"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+# Apply database migrations on every deploy, before the new version takes traffic.
+[deploy]
+  release_command = "alembic upgrade head"
+
+[env]
+  # The externally reachable base URL. MUST match how clients reach the server,
+  # because OAuth discovery advertises it as the issuer. Update if you rename the app.
+  PURSE_PUBLIC_URL = "https://purse-staging.fly.dev"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

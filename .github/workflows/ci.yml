@@ -115,6 +115,7 @@ jobs:
         env:
           POSTGRES_PASSWORD: ci-placeholder
           DATABASE_URL: postgresql://purse:ci-placeholder@db:5432/purse
+          PURSE_OAUTH_SECRET: ci-placeholder-signing-secret
         run: docker compose -f docker-compose.dev.yml config --quiet
 
       - name: Assert no secrets are hardcoded in the compose file
@@ -141,4 +142,30 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Smoke test the image
-        run: docker run --rm purse:ci
+        # Boot the real gateway and confirm it serves OAuth discovery. Env vars
+        # are placeholders — the metadata route needs no database (the engine is
+        # lazy), so this proves the assembled app imports, uvicorn binds, and the
+        # OAuth AS answers, without a Postgres service in this job.
+        run: |
+          docker run -d --name purse_smoke -p 8080:8080 \
+            -e PURSE_PUBLIC_URL=http://localhost:8080 \
+            -e PURSE_OAUTH_SECRET=ci-smoke-signing-secret \
+            -e DATABASE_URL=postgresql+psycopg://u:p@127.0.0.1:1/none \
+            purse:ci
+          ok=""
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8080/.well-known/oauth-authorization-server -o meta.json; then
+              ok=1; break
+            fi
+            sleep 1
+          done
+          if [ -z "$ok" ]; then
+            echo "::error::gateway did not answer on /.well-known within 30s"
+            docker logs purse_smoke || true
+            docker rm -f purse_smoke || true
+            exit 1
+          fi
+          echo "discovery metadata:"; cat meta.json
+          grep -q '"client_id_metadata_document_supported": *true' meta.json \
+            || { echo "::error::CIMD flag missing from discovery metadata"; docker logs purse_smoke; docker rm -f purse_smoke; exit 1; }
+          docker rm -f purse_smoke
