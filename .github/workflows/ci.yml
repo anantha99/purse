@@ -40,7 +40,67 @@ jobs:
         run: uv run mypy purse
 
       - name: Pytest
+        # No database here on purpose: the DB tests skip, and this job proves
+        # the unit tests do not quietly depend on one. tests-db is the job that
+        # must not skip.
         run: uv run pytest
+
+  tests-db:
+    name: Database tests (Postgres + pgvector)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        # Same image as docker-compose.dev.yml — CI and a laptop must agree on
+        # the pgvector version, or "works locally" means nothing.
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: purse
+          # Ephemeral service container on a private network, never reachable
+          # from outside the runner. A real deployment reads this from the
+          # environment (see .env.example); nothing here is a secret.
+          POSTGRES_PASSWORD: purse_ci_local
+          POSTGRES_DB: purse
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U purse -d purse"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+          --health-start-period 10s
+    env:
+      DATABASE_URL: postgresql+psycopg://purse:purse_ci_local@localhost:5432/purse
+      # The load-bearing line. With REQUIRE_DB set, a database test that would
+      # have skipped fails the job instead (tests/conftest.py). Without it, a
+      # broken service container would look exactly like a green build.
+      REQUIRE_DB: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Assert the database tests are actually collected
+        # Guards the other direction. REQUIRE_DB turns a skip into a failure,
+        # but zero collected tests would still be green. If the marker or the
+        # test layout ever changes, this fails loudly instead.
+        run: |
+          count=$(uv run pytest -m db --collect-only -q | grep -c '::' || true)
+          echo "collected $count database tests"
+          if [ "$count" -lt 40 ]; then
+            echo "::error::expected the C1 database suite, collected only $count tests"
+            exit 1
+          fi
+
+      - name: Pytest (database tests must run, not skip)
+        run: uv run pytest -ra
 
   container:
     name: Compose config and image build
