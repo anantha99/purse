@@ -26,4 +26,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 RUN useradd --create-home --uid 10001 purse && chown -R purse:purse /app
 USER purse
 
-CMD ["python", "-c", "import purse; print(purse.__version__)"]
+EXPOSE 8080
+# PORT is provided by the platform (Fly/Railway); default for local runs.
+CMD ["sh", "-c", "uvicorn purse.gateway.serve:app --host 0.0.0.0 --port ${PORT:-8080}"]

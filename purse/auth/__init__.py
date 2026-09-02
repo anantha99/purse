@@ -32,6 +32,14 @@ from purse.auth.errors import (
     ErrorCode,
     ScopeError,
 )
+from purse.auth.oauth import (
+    PatVerifier,
+    PurseOAuthProvider,
+    StaticClient,
+    auth_context_from_access_token,
+    build_purse_auth,
+    build_purse_auth_from_env,
+)
 from purse.auth.pat import authenticate_pat
 from purse.auth.provisioning import ProvisioningError, mint_pat, revoke_connection
 from purse.auth.scopes import (
@@ -59,12 +67,18 @@ __all__ = [
     "AuthError",
     "AuthenticationError",
     "ErrorCode",
+    "PatVerifier",
     "ProvisioningError",
+    "PurseOAuthProvider",
     "RawToken",
     "Scope",
     "ScopeError",
+    "StaticClient",
     "UnknownScopeError",
+    "auth_context_from_access_token",
     "authenticate_pat",
+    "build_purse_auth",
+    "build_purse_auth_from_env",
     "format_scopes",
     "generate_token",
     "has_scope",
