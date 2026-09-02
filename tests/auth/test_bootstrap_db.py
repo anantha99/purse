@@ -19,7 +19,9 @@ from purse.auth.pat import authenticate_pat
 from purse.auth.scopes import ONBOARDING_SCOPES, Scope
 from purse.auth.tokens import TOKEN_PREFIX
 from purse.db.models import User
-from purse.db.repo import create_user, list_user_workspaces
+from purse.db.repo import Repo, create_user, list_user_workspaces
+from purse.skills import service as skills_service
+from tests.conftest import StubContext
 
 pytestmark = pytest.mark.db
 
@@ -106,6 +108,34 @@ def test_bootstrap_workspaces_are_separate_when_named_separately(session: Sessio
     work = bootstrap(session, email=EMAIL, workspace_name="Work")
     assert work.workspace_id != personal.workspace_id
     assert authenticate_pat(session, work.token.reveal()).workspace_id == work.workspace_id
+
+
+# -- the bundled skill (C5.4) -------------------------------------------------
+
+
+def test_bootstrap_seeds_the_save_policy_skill(session: Session) -> None:
+    """First boot must leave the workspace with a usable ``purse-save-policy``.
+
+    PRD §8.2: the guided "what is worth saving" moment depends on this skill
+    existing from the first request, not on a client upserting it later.
+    """
+    result = bootstrap(session, email=EMAIL)
+    ctx = StubContext(connection_id=result.connection_id, workspace_id=result.workspace_id)
+
+    skill = skills_service.get_skill(session, ctx, name="purse-save-policy")
+    assert skill.version == "1.0.0"
+    assert skill.description
+
+
+def test_bootstrap_does_not_duplicate_the_seeded_skill_on_rerun(session: Session) -> None:
+    """Re-running bootstrap (a lost-credential recovery) must stay a no-op for the
+    seed: no second version, and no exception from the idempotent upsert path."""
+    first = bootstrap(session, email=EMAIL)
+    bootstrap(session, email=EMAIL)  # must not raise
+
+    repo = Repo.open(session, first.workspace_id)
+    versions = repo.list_skill_versions("purse-save-policy")
+    assert len(versions) == 1
 
 
 # -- the printed block -------------------------------------------------------

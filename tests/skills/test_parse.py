@@ -161,3 +161,57 @@ def test_document_exactly_at_the_cap_is_accepted() -> None:
     body = "a" * (MAX_CONTENT_BYTES - len(header.encode("utf-8")))
     parsed = parse_skill(header + body)
     assert len(parsed.content.encode("utf-8")) == MAX_CONTENT_BYTES
+
+
+# ---------------------------------------------------------------------------
+# The cap is bytes of UTF-8, not characters
+# ---------------------------------------------------------------------------
+#
+# The ASCII-filler tests above cannot distinguish "64 KB of bytes" from "64K
+# characters" because for ASCII the two counts are identical. A multibyte filler
+# makes that distinction observable: one character costs more than one byte, so
+# a body sized in *characters* to hit the cap would land on the wrong side of it
+# if the check were counting characters instead of encoded bytes.
+
+_BIG_HEADER = "---\nname: big\ndescription: d\nversion: 1.0.0\n---\n"
+
+
+def _document_of_exact_size(total_bytes: int, filler: str) -> str:
+    """A document whose UTF-8-encoded size is exactly *total_bytes*.
+
+    The body is packed with *filler* (a multibyte character) as far as it goes,
+    then topped up with single-byte padding so the total lands on the exact byte
+    count requested — precise sizing regardless of how *filler*'s width divides
+    into the remainder.
+    """
+    header_bytes = len(_BIG_HEADER.encode("utf-8"))
+    target_body_bytes = total_bytes - header_bytes
+    filler_bytes = len(filler.encode("utf-8"))
+    count, remainder = divmod(target_body_bytes, filler_bytes)
+    body = filler * count + "a" * remainder
+    document = _BIG_HEADER + body
+    assert len(document.encode("utf-8")) == total_bytes
+    return document
+
+
+def test_oversized_multibyte_document_is_payload_too_large() -> None:
+    """A body of 3-byte characters ('€'), sized so the whole document is exactly
+    one UTF-8 byte over the 64 KiB cap."""
+    document = _document_of_exact_size(MAX_CONTENT_BYTES + 1, "€")
+    with pytest.raises(PayloadTooLargeError):
+        parse_skill(document)
+
+
+def test_document_exactly_at_the_cap_with_multibyte_filler_is_accepted() -> None:
+    """The same construction, sized to land exactly on the cap: accepted.
+
+    Proves the boundary is measured in encoded bytes rather than character
+    count — a naive ``len(content)`` check would accept a body several times
+    over 64 KiB of actual storage, since a 4-byte emoji is one ``len()`` unit but
+    four bytes on the wire.
+    """
+    document = _document_of_exact_size(MAX_CONTENT_BYTES, "\U0001f600")
+    # Far fewer characters than bytes — the point of the test.
+    assert len(document) < MAX_CONTENT_BYTES
+    parsed = parse_skill(document)
+    assert len(parsed.content.encode("utf-8")) == MAX_CONTENT_BYTES
