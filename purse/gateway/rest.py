@@ -87,6 +87,7 @@ directly:
 # Everything annotated in this file is valid at runtime on 3.12 (`X | None`,
 # builtin generics), so nothing is lost by leaving the future import out.
 
+import math
 import uuid
 from collections.abc import Callable, Collection, Iterator
 from dataclasses import dataclass
@@ -98,7 +99,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
-from purse.gateway.errors import GatewayError, UnauthorizedError
+from purse.gateway.errors import GatewayError, RateLimitedError, UnauthorizedError
+from purse.gateway.ratelimit import RateLimiter, RateLimitExceeded
 from purse.memory import service
 from purse.memory.engine import MemoryEngine
 from purse.memory.errors import MemoryError_
@@ -274,6 +276,20 @@ def _error_response(status: int, code: str, message: str) -> JSONResponse:
     return JSONResponse(status_code=status, content={"error": {"code": code, "message": message}})
 
 
+def _limit_write(limiter: RateLimiter | None, ctx: RequestContext) -> None:
+    """Charge one write against this connection's budget (PRD §13, C2.10).
+
+    Called after the scope check and before the service write, so a limited
+    caller never touches the database. ``limiter is None`` disables limiting.
+    """
+    if limiter is None:
+        return
+    try:
+        limiter.check(ctx.connection_id)
+    except RateLimitExceeded as exc:
+        raise RateLimitedError(str(exc), retry_after=exc.retry_after) from exc
+
+
 def _bearer_token(request: Request) -> str:
     """Extract the bearer token, or raise ``UnauthorizedError``.
 
@@ -297,6 +313,7 @@ def create_app(
     authenticate: Authenticate,
     *,
     require_scope: RequireScope = _allow_every_scope,
+    limiter: RateLimiter | None = None,
     title: str = "Purse",
 ) -> FastAPI:
     """Build the REST app.
@@ -312,6 +329,11 @@ def create_app(
         :class:`~purse.gateway.errors.ScopeError` when the scope is missing.
         Defaults to permitting everything — see the module docstring for why,
         and wire the real one from ``purse.auth``.
+    :param limiter: The shared per-connection write limiter (PRD §13, C2.10).
+        Only write endpoints are charged; reads are never limited. ``None``
+        disables limiting — the default, so the M1 tests are unaffected. The
+        assembled app passes ONE instance shared with the MCP surface
+        (:mod:`purse.gateway.asgi`) so the budget is unified across both.
     """
     app = FastAPI(title=title, version="0.0.1")
 
@@ -360,6 +382,11 @@ def create_app(
             # RFC 6750: a 401 without this is a protocol violation, and some
             # clients use it to decide whether to start an OAuth flow (C2).
             response.headers["WWW-Authenticate"] = "Bearer"
+        retry_after = getattr(error, "retry_after", None)
+        if error.status == 429 and retry_after is not None:
+            # RFC 6585: a 429 SHOULD say how long to wait. Seconds, rounded up so
+            # a client that waits exactly this long finds the bucket has refilled.
+            response.headers["Retry-After"] = str(math.ceil(retry_after))
         return response
 
     async def on_memory_error(request: Request, exc: Exception) -> JSONResponse:
@@ -385,6 +412,7 @@ def create_app(
     @app.post("/v1/memories", status_code=201)
     def add_memory(body: AddMemoryRequest, ctx: Ctx, session: Db) -> dict[str, Any]:
         require_scope(ctx.caller, MEMORY_WRITE)
+        _limit_write(limiter, ctx)
         record = service.add_memory(
             session,
             ctx,
@@ -427,6 +455,7 @@ def create_app(
         memory_id: uuid.UUID, body: UpdateMemoryRequest, ctx: Ctx, session: Db
     ) -> dict[str, Any]:
         require_scope(ctx.caller, MEMORY_WRITE)
+        _limit_write(limiter, ctx)
         record = service.update_memory(
             session, ctx, engine, memory_id=memory_id, content=body.content
         )
@@ -435,6 +464,7 @@ def create_app(
     @app.delete("/v1/memories/{memory_id}")
     def delete_memory(memory_id: uuid.UUID, ctx: Ctx, session: Db) -> dict[str, Any]:
         require_scope(ctx.caller, MEMORY_WRITE)
+        _limit_write(limiter, ctx)
         service.delete_memory(session, ctx, memory_id=memory_id)
         # 200 with a body, not 204: the tombstone is idempotent, and echoing the
         # id back is what makes a retry legible in a client's logs.

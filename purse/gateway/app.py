@@ -26,6 +26,7 @@ from purse.auth.pat import authenticate_pat
 from purse.auth.scopes import Scope
 from purse.db.session import create_db_engine, session_factory
 from purse.gateway.errors import ScopeError, UnauthorizedError
+from purse.gateway.ratelimit import RateLimiter
 from purse.gateway.rest import GatewayContext, create_app
 from purse.memory.engine import MemoryEngine, NullEngine
 
@@ -66,6 +67,7 @@ def create_default_app(
     database_url: str | None = None,
     engine: MemoryEngine | None = None,
     make_session: Callable[[], Session] | None = None,
+    limiter: RateLimiter | None = None,
 ) -> FastAPI:
     """The fully wired app: real DB sessions, real PAT auth, injectable engine.
 
@@ -73,6 +75,11 @@ def create_default_app(
     rollback transaction; production callers pass nothing and get sessions from
     ``DATABASE_URL``. The memory engine defaults to :class:`NullEngine` until
     the Mem0 adapter lands (C3.4).
+
+    ``limiter`` is the shared per-connection write limiter (PRD §13, C2.10),
+    passed through to the REST app. :mod:`purse.gateway.asgi` constructs one and
+    shares it with the MCP surface; ``None`` (the default) leaves writes
+    unlimited, as the pre-C2.10 tests expect.
     """
     if make_session is None:
         make_session = session_factory(create_db_engine(database_url))
@@ -81,4 +88,5 @@ def create_default_app(
         engine=engine if engine is not None else NullEngine(),
         authenticate=authenticate,
         require_scope=require_scope,
+        limiter=limiter,
     )

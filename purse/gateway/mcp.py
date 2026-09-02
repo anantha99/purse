@@ -59,6 +59,7 @@ from purse.auth.oauth.claims import (
     CLAIM_WRITES_ENABLED,
 )
 from purse.auth.scopes import Scope
+from purse.gateway.ratelimit import RateLimiter, RateLimitExceeded
 from purse.memory import service
 from purse.memory.engine import MemoryEngine
 from purse.memory.errors import MemoryError_
@@ -218,6 +219,22 @@ def _require(caller: AuthContext, scope: Scope) -> None:
         raise MCPToolError(MCPErrorCode.UNAUTHORIZED_SCOPE, str(exc)) from exc
 
 
+def _limit_write(limiter: RateLimiter | None, caller: AuthContext) -> None:
+    """Charge one write against *caller*'s per-connection budget (PRD §13, C2.10).
+
+    Called after the scope check and before the service write, so a refused
+    caller never touches the database. ``limiter is None`` disables limiting —
+    the default for the in-memory/registration tests and any call site that does
+    not opt in; the assembled app (:mod:`purse.gateway.asgi`) always passes one.
+    """
+    if limiter is None:
+        return
+    try:
+        limiter.check(caller.connection_id)
+    except RateLimitExceeded as exc:
+        raise MCPToolError(MCPErrorCode.RATE_LIMITED, str(exc)) from exc
+
+
 @contextlib.contextmanager
 def _unit_of_work(session_factory: Callable[[], Session]) -> Iterator[Session]:
     """One request, one transaction — commit on success, roll back on any error.
@@ -265,6 +282,7 @@ def create_mcp_server(
     session_factory: Callable[[], Session],
     engine: MemoryEngine,
     auth: AuthProvider | None,
+    limiter: RateLimiter | None = None,
     name: str = "Purse",
 ) -> FastMCP:
     """Build the FastMCP server with the five memory tools (C4.1-C4.3).
@@ -282,6 +300,12 @@ def create_mcp_server(
         builds an unauthenticated server (every tool then refuses with
         ``UNAUTHENTICATED``) — useful only for schema/registration tests over the
         in-memory transport, which does not run the HTTP auth stack.
+
+    :param limiter: The shared per-connection write limiter (PRD §13, C2.10).
+        ``None`` disables limiting — the default, so registration/in-memory tests
+        are unaffected. The assembled app passes ONE instance shared with the REST
+        surface (:mod:`purse.gateway.asgi`) so a connection's write budget is
+        unified across both.
 
     The returned server is transport-agnostic; :func:`create_mcp_http_app` wraps
     it as a stateless Streamable HTTP ASGI app.
@@ -320,6 +344,7 @@ def create_mcp_server(
         """
         caller = _resolve_caller()
         _require(caller, Scope.MEMORY_WRITE)
+        _limit_write(limiter, caller)
         ctx = _ToolContext(caller=caller)
         with _mapped_errors(), _unit_of_work(session_factory) as session:
             record = service.add_memory(
@@ -356,6 +381,7 @@ def create_mcp_server(
         """
         caller = _resolve_caller()
         _require(caller, Scope.MEMORY_WRITE)
+        _limit_write(limiter, caller)
         ctx = _ToolContext(caller=caller)
         with _mapped_errors(), _unit_of_work(session_factory) as session:
             record = service.update_memory(
@@ -372,6 +398,7 @@ def create_mcp_server(
         """
         caller = _resolve_caller()
         _require(caller, Scope.MEMORY_WRITE)
+        _limit_write(limiter, caller)
         ctx = _ToolContext(caller=caller)
         memory_id = _parse_id(id)
         with _mapped_errors(), _unit_of_work(session_factory) as session:
