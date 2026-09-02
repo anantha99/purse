@@ -67,8 +67,8 @@
 
 Order chosen by which client each mode unblocks (§9), not by spec elegance.
 
-- [ ] C2.1 **PAT** — scoped, revocable, shown once, hashed at rest. Unblocks: Codex, OpenClaw, self-host (M1)
-- [ ] C2.2 Scope model + middleware: `memory:read|write`, `skills:read|write`, `apis:use|manage`; onboarding connection = `memory:*, skills:read`, writes-on badge data; later connections default read-only (§7.1)
+- [x] C2.1 **PAT** — `purse_pat_` tokens, 256-bit, sha256-at-rest, redacting token type, shown once; revocable; no failure-mode oracle (revoked == unknown); constant-time compare. Bootstrap prints credentials once *(PR #2)*
+- [x] C2.2 Scope model: six scopes, onboarding/default grant sets, `AuthContext` + `require_scope`; `writes_enabled=False` hard-cuts write scopes even when granted *(PR #2)*
 - [ ] C2.3 OAuth 2.1 core: authorization code + PKCE, token expiry + refresh (M2)
 - [ ] C2.4 Discovery metadata: RFC 8414 + RFC 9728 (M2)
 - [ ] C2.5 **CIMD — now the primary OAuth path** (spec 2026-07-28 deprecates DCR): wire FastMCP's `CIMDClientManager` + `PrivateKeyJWTClientAuthenticator`; AS metadata MUST advertise `client_id_metadata_document_supported: true` AND `"none"` in `token_endpoint_auth_methods_supported` (Anthropic gates on both — vanilla provider silently downgrades to DCR). Unblocks: Claude surfaces, ChatGPT, VS Code (M2)
@@ -77,19 +77,21 @@ Order chosen by which client each mode unblocks (§9), not by spec elegance.
 - [ ] C2.8 **DCR** (RFC 7591) — compatibility fallback for clients not yet on CIMD; native in FastMCP 4 via `RegistrationHandler`. Honour SEP-837 `application_type`. (Dropped: the "401 re-registration signal" — not documented client behavior) (M2)
 - [ ] C2.9 Callback allowlist: claude.ai AND claude.com callbacks; ChatGPT's distinct callback; never assume hosts share OAuth identity (§8.5)
 - [ ] C2.10 Rate limits: writes 60/min, `use_api` 30/min per connection (§13)
-- [ ] C2.11 Revocation: connection revoke kills tokens immediately; audit entry
+- [x] C2.11 Revocation: `revoke_connection` (idempotent) — authenticate fails immediately after; revoked indistinguishable from unknown *(PR #2)*
 
 ## C3 — Memory (M1–M2)
 
-- [ ] C3.1 Canonical write path: `add_memory` → verbatim insert with provenance, UUID, timestamps (sync) → audit
-- [ ] C3.2 Supersession + tombstone: `update_memory` writes new row w/ `supersedes`; `delete_memory` tombstones; current view over the log
-- [ ] C3.3 `MemoryEngine` interface: ingest(record), search(query, workspace, limit), rebuild(workspace), drop(workspace)
+- [x] C3.1 Canonical write path: `add_memory` → verbatim insert with provenance (sync) → audit; ≤4096 UTF-8 *bytes*; engine ingest best-effort, never loses a write *(PR #2)*
+- [x] C3.2 Supersession + tombstone: `update_memory` writes new row w/ `supersedes`; `delete_memory` tombstones (idempotent); keyset-paginated list over current view *(PR #2)*
+- [x] C3.3 `MemoryEngine` interface (ingest/search/rebuild/drop) + `NullEngine`; ILIKE text-search fallback until Mem0 (C3.4). Failures can't fail a canonical write — AST-asserted no unguarded engine call *(PR #2)*
 - [ ] C3.4 Mem0 OSS adapter (embedded, pin `mem0ai==2.0.19`): async ingest via background task queue; ingest failure = canonical write still succeeds. Config: always set `embedding_model_dims` explicitly (open P1 bug — silent data loss if unset); note history store is SQLite-only
 - [ ] C3.4b **Mem0 ranking verification test (do FIRST, ~1 hr):** open issue #6883 — pgvector returns cosine *distance* but `score_and_rank` treats it as *similarity*, inverting rankings. Seed 50 memories, verify top-k is actually nearest. If broken: patch/workaround or lean on our own pgvector fallback (C3.5) for ranking
 - [ ] C3.5 Semantic search: pgvector fallback + Mem0 recall, ranked results with provenance
 - [ ] C3.6 Index rebuild command: drop + replay canonical log (proves "derived, droppable" §3.1–2)
 - [ ] C3.7 **`purse-save-policy` skill** — the save-skill as a versioned artifact in-repo; wording iterated via its own issues (§8.2, product surface)
-- [ ] C3.8 REST endpoints add/search (M1, pre-MCP smoke path)
+- [x] C3.8 REST `/v1/memories` CRUD + search, PRD-shaped structured errors, `X-Purse-Agent` per-call claim; `purse/gateway/app.py` wires real PAT auth *(PR #2)*
+
+> **✅ Milestone M1 (Spine) complete** — PR #1 (data layer) + PR #2 (PAT auth, memory core, REST, end-to-end wiring). A minted PAT can `curl` a fact into the vault and search it back over authenticated HTTP; every write is provenanced and audited; revoked==unknown; 393 tests green vs real Postgres in CI. Remaining C3 items (Mem0 adapter C3.4–3.6, save-policy skill C3.7) are M2/M3 work.
 
 ## C4 — MCP gateway & tools (M2 core)
 
