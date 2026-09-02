@@ -16,9 +16,18 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
 ]
 
-# No runtime dependencies yet. The C0.4 FastMCP spike decides the fastmcp pin
-# (and the authlib fallback) before anything lands here.
-dependencies = []
+# Data layer (C1). The FastMCP pin from the C0.4 spike lands with C4.
+dependencies = [
+    # Migrations.
+    "alembic>=1.14",
+    # pgvector's SQLAlchemy type. The extension itself comes from the
+    # pgvector/pgvector:pg17 image.
+    "pgvector>=0.3.6",
+    # psycopg 3. The binary extra ships wheels, so there is no libpq build step
+    # on any supported interpreter (3.12-3.14).
+    "psycopg[binary]>=3.2",
+    "sqlalchemy>=2.0.36",
+]
 
 [dependency-groups]
 dev = [
@@ -127,3 +136,6 @@ extra_checks = true
 minversion = "8.0"
 testpaths = ["tests"]
 addopts = "-ra --strict-markers --strict-config"
+markers = [
+    "db: needs a real Postgres with pgvector (TEST_DATABASE_URL or DATABASE_URL). Skipped when absent — unless REQUIRE_DB=1, which turns the skip into a failure so CI cannot go green on tests that never ran.",
+]
