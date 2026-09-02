@@ -12,8 +12,11 @@ primary_region = "iad"
   dockerfile = "Dockerfile"
 
 # Apply database migrations on every deploy, before the new version takes traffic.
+# Uses the programmatic entrypoint (builds Alembic config from the packaged
+# migrations) rather than the `alembic` CLI, since alembic.ini is not shipped in
+# the image — only the purse package is.
 [deploy]
-  release_command = "alembic upgrade head"
+  release_command = "python -c \"from purse.db.migrate import upgrade; upgrade()\""
 
 [env]
   # The externally reachable base URL. MUST match how clients reach the server,
