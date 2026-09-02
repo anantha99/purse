@@ -213,6 +213,27 @@ def test_static_client_lookup_returns_a_loopback_aware_client() -> None:
     )
 
 
+def test_known_cimd_client_resolves_locally_without_a_fetch() -> None:
+    # Claude Code's CIMD document is behind a CDN that 403s datacenter IPs, so the
+    # SSRF fetch path can't reach it from a hosted instance. The bundled seed must
+    # resolve it with no network call, and with loopback-port flexibility so an
+    # ephemeral callback port is accepted.
+    provider = PurseOAuthProvider(
+        base_url="https://vault.example.com",
+        session_scope_factory=_session_factory_that_must_not_run(),
+        secret="signing-secret",  # noqa: S106 - test fixture value, not a real credential
+    )
+    client_id = "https://claude.ai/oauth/claude-code-client-metadata"
+    client = asyncio.run(provider.get_client(client_id))
+    assert client is not None
+    assert isinstance(client, PurseClient)
+    assert client.client_name == "Claude Code"
+    assert client.token_endpoint_auth_method == "none"  # noqa: S105 - auth-method name, public client
+    assert str(client.validate_redirect_uri(AnyUrl("http://localhost:3118/callback"))).startswith(
+        "http://localhost:3118"
+    )
+
+
 def test_unknown_client_id_resolves_to_none_without_db() -> None:
     provider = PurseOAuthProvider(
         base_url="https://vault.example.com",

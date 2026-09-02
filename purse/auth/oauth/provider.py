@@ -139,6 +139,29 @@ class StaticClient:
     client_name: str = ""
 
 
+# First-party CIMD clients whose metadata documents we bundle instead of fetching.
+#
+# CIMD normally resolves a URL client_id by fetching that URL. In practice the
+# major clients host their metadata behind a CDN (Cloudflare) that 403s requests
+# from datacenter egress IPs — so a self-hosted AS on Fly/Render/etc. cannot fetch
+# them, and CIMD breaks for exactly the clients it exists to serve. Seeding the
+# public, stable first-party documents makes these clients resolve with no network
+# call; genuinely unknown CIMD URLs still go through the SSRF-guarded fetch path.
+# Loopback-only redirects mean a bundled entry can only ever deliver a code to the
+# user's own machine, so trusting the client_id URL here carries minimal risk.
+#
+# Verified from the live document on 2026-09-02. Add Claude web / ChatGPT here as
+# each is tested (their CIMD URLs and callbacks differ from Claude Code's).
+KNOWN_CIMD_CLIENTS: tuple[StaticClient, ...] = (
+    StaticClient(
+        client_id="https://claude.ai/oauth/claude-code-client-metadata",
+        redirect_uris=("http://localhost/callback", "http://127.0.0.1/callback"),
+        client_secret=None,  # public client (token_endpoint_auth_method = none)
+        client_name="Claude Code",
+    ),
+)
+
+
 @dataclass(frozen=True, slots=True)
 class ConnectionSnapshot:
     """The connection fields a verified access token resolves to."""
@@ -317,8 +340,12 @@ class PurseOAuthProvider(OAuthProvider):
             session_scope_factory, resolve_workspace_id=resolve_workspace_id
         )
         self._cimd = CIMDClientManager(enable_cimd=True)
+        # Known first-party CIMD clients are seeded as local clients so get_client
+        # resolves them (below) before ever attempting a fetch; caller-supplied
+        # static_clients come last so a deployment can override a bundled entry.
         self._statics: dict[str, PurseClient] = {
-            config.client_id: _static_to_client(config) for config in static_clients
+            config.client_id: _static_to_client(config)
+            for config in (*KNOWN_CIMD_CLIENTS, *static_clients)
         }
         self._codes = AuthorizationCodeStore(ttl_seconds=auth_code_ttl_seconds)
         self._refresh = RefreshTokenStore()
