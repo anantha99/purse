@@ -137,7 +137,9 @@ Order chosen by which client each mode unblocks (§9), not by spec elegance.
 
 One issue per client: verified connect-auth-call flow + doc page with screenshots + caveats + CI script.
 
-- [ ] C8.1 **Claude Code** — DCR + PKCE, loopback ephemeral ports (M2)
+> **CIMD reality (found during live C8.1 testing):** first-party clients (Claude Code, etc.) host their CIMD metadata behind Cloudflare, which **403s datacenter egress IPs** — a hosted AS cannot fetch them. Fixed by seeding the bundled first-party CIMD docs so they resolve without a fetch (PR #5). Any new client that connects via CIMD from a hosted instance needs its doc seeded in `KNOWN_CIMD_CLIENTS`.
+
+- [x] C8.1 **Claude Code** — CIMD + PKCE, port-agnostic loopback. **Verified LIVE** against staging: OAuth → approve page → connected read-only → recalled a memory written via the REST/PAT path (cross-tool recall proven). Doc-page + CI script still to formalize *(PR #5)*
 - [ ] C8.2 **Claude web/Desktop** — DCR/CIMD via Connectors; document mobile limitation + "remove & re-add" for cached negative verdicts (M2)
 - [ ] C8.3 **Cursor** — static pre-registered client via `.cursor/mcp.json` (M2)
 - [ ] C8.4 **Codex** — **PAT-first** (`bearer_token_env_var`); document OAuth bugs and why PAT sidesteps them (M2)
