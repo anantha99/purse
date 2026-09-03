@@ -33,6 +33,7 @@ from purse.gateway.mcp import create_mcp_http_app, create_mcp_server
 from purse.gateway.ratelimit import RateLimiter
 from purse.memory.engine import MemoryEngine
 from purse.memory.mem0_engine import build_memory_engine_from_env
+from purse.web.app import create_web_router
 
 __all__ = ["create_purse_app", "create_purse_app_from_env"]
 
@@ -96,11 +97,20 @@ def create_purse_app(
     # lifespan (the stateless session manager), which uvicorn/TestClient must run.
     app: Starlette = create_mcp_http_app(server, path=mcp_path)
 
+    # The operator dashboard (C7) — session-authenticated, at a real ``/web``
+    # prefix so it claims only its own paths. Mounted BEFORE the empty-prefix REST
+    # catch-all below (which would otherwise swallow ``/web/*`` and 404 it). Its
+    # session secret + owner password are read from the env at construction; if
+    # PURSE_OWNER_PASSWORD is unset the routes still mount and boot succeeds —
+    # ``/web/login`` just returns a clear "login not configured" error.
+    web_app = create_web_router(make_session, index)
+    app.router.routes.append(Mount("/web", app=web_app))
+
     # The REST smoke surface authenticates PATs only (create_default_app wires the
     # PAT path); it shares the same engine and sessions. It already owns the full
     # ``/v1/...`` paths and its own FastAPI error handlers, so it is mounted with an
-    # empty prefix (nothing stripped) and appended LAST — the MCP and OAuth routes
-    # above match first, and only what they don't claim falls through to REST.
+    # empty prefix (nothing stripped) and appended LAST — the MCP, OAuth, and /web
+    # routes above match first, and only what they don't claim falls through to REST.
     rest_app = create_default_app(make_session=make_session, engine=index, limiter=write_limiter)
     app.router.routes.append(Mount("", app=rest_app))
 
