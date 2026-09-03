@@ -124,14 +124,16 @@ Order chosen by which client each mode unblocks (§9), not by spec elegance.
 
 ## C7 — Web UI (M3)
 
-- [ ] C7.1 Onboarding: vault auto-create + Personal workspace; **copy-MCP-URL front and center**; per-client setup snippets; guided "save that I prefer TypeScript" moment (§7.1)
-- [ ] C7.2 Memories: current + history, search, edit (supersede) / tombstone, provenance filter
-- [ ] C7.3 Skills: list/edit with version bump
-- [ ] C7.4 APIs: add/rotate/revoke, allowlist editor, per-connection grants, key shown once
-- [ ] C7.5 Connections: scopes, "writes on" badge, one-tap revoke
-- [ ] C7.6 Static client + PAT management screens
-- [ ] C7.7 Audit view: last 100 writes/executions
-- [ ] C7.8 Export button → C1.9
+> **Stack: Next.js 15 (app-router, TS, Tailwind)** dark-first per `docs/design/purse-design-direction.html`, as its own compose/Fly service. Backend `purse/web`: operator session auth (password → signed token, BFF, no cross-site cookies) + `/web` API. **Live on staging, security-verified (PR #8).** Route base is `/dashboard` (not `/app` — the app/app nesting broke `/` on Linux builds).
+
+- [x] C7.1 Landing (public homepage — OSS/self-host pitch, copy-MCP-URL) + operator login *(PR #8)*. Guided first-save onboarding moment — later polish.
+- [x] C7.2 Memories: current + history, semantic search, add, edit (supersede) / tombstone, provenance chips *(PR #8)*
+- [x] C7.3 Skills: list + markdown editor with version bump *(PR #8)*
+- [ ] C7.4 APIs: add/rotate/revoke, allowlist editor, per-connection grants, key shown once — **stub ("coming soon") until C6 secrets exist**
+- [x] C7.5 Connections: auth-mode, scope chips, "writes on" badge, status dot, one-tap revoke *(PR #8)*
+- [x] C7.6 PAT management (mint shown-once, list, revoke) *(PR #8)*. Static-client registration UI — later.
+- [x] C7.7 Audit view: last 100, newest-first *(PR #8)*
+- [x] C7.8 Export button → C1.9 vault JSON *(PR #8)*
 
 ## C8 — Client compatibility matrix (M2: 4 → M3: 7) — `launch-gate`
 
