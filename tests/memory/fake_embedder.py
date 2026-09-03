@@ -7,15 +7,18 @@ fake embedder that Mem0 will use in place of OpenAI.
 
 .. rubric:: The extension point
 
-Mem0 has no "pass me an embedder instance" hook. ``Memory.__init__`` builds the
-embedder through ``EmbedderFactory.create(provider_name, config, vector_config)``,
-which looks ``provider_name`` up in the class-level dict
-``EmbedderFactory.provider_to_class`` (mapping name → dotted import path),
-``load_class`` es it, and calls ``EmbeddingClass(BaseEmbedderConfig(**config))``.
-So the clean injection is to **register a new provider name** pointing at an
-importable class here, and construct the engine with
-``EmbeddingConfig(provider=FAKE_PROVIDER, ...)``. No monkeypatching of Mem0
-internals, no network, no key.
+Mem0 builds the embedder through ``EmbedderFactory.create(provider, config, ...)``,
+which looks ``provider`` up in the class-level dict
+``EmbedderFactory.provider_to_class`` and ``load_class`` es it. Registering a
+*new* provider name there is not enough: ``mem0ai==2.0.19`` validates the provider
+against a **hardcoded pydantic allowlist** (``mem0/embeddings/configs.py``:
+``openai``, ``ollama``, … ``fastembed``) inside ``MemoryConfig(**dict)``, which runs
+*before* the factory is ever consulted — an unknown name raises
+``ValidationError`` at ``Memory.from_config``. So the injection instead **rebinds
+an allowlisted provider** (``openai``) to the fake class for the duration of a test
+and constructs the engine with ``provider="openai"``. Validation passes (the name
+is on the allowlist), and the factory loads the fake class. Production never calls
+:func:`register_fake_embedder`, so its real ``openai`` embedder is untouched.
 
 .. rubric:: The embedding
 
@@ -39,11 +42,20 @@ from mem0.configs.embeddings.base import BaseEmbedderConfig
 from mem0.embeddings.base import EmbeddingBase
 from mem0.utils.factory import EmbedderFactory
 
-__all__ = ["FAKE_PROVIDER", "DeterministicFakeEmbedder", "register_fake_embedder"]
+__all__ = [
+    "FAKE_PROVIDER",
+    "DeterministicFakeEmbedder",
+    "register_fake_embedder",
+    "unregister_fake_embedder",
+]
 
-#: The Mem0 embedder provider name the tests select. Registered into
-#: ``EmbedderFactory`` by :func:`register_fake_embedder`.
-FAKE_PROVIDER = "purse_fake"
+#: An allowlisted Mem0 provider name (so ``MemoryConfig`` validation passes); tests
+#: rebind it to the fake class via :func:`register_fake_embedder`.
+FAKE_PROVIDER = "openai"
+
+#: The real class path we displace, restored by :func:`unregister_fake_embedder`.
+_ORIGINAL: str | None = None
+_PATCHED = False
 
 _TOKEN = re.compile(r"[a-z0-9]+")
 
@@ -78,7 +90,25 @@ class DeterministicFakeEmbedder(EmbeddingBase):
 
 
 def register_fake_embedder() -> None:
-    """Make :data:`FAKE_PROVIDER` available to Mem0's embedder factory. Idempotent."""
+    """Rebind the ``openai`` embedder to the fake class. Idempotent."""
+    global _ORIGINAL, _PATCHED
+    if _PATCHED:
+        return
+    _ORIGINAL = EmbedderFactory.provider_to_class.get(FAKE_PROVIDER)
     EmbedderFactory.provider_to_class[FAKE_PROVIDER] = (
         "tests.memory.fake_embedder.DeterministicFakeEmbedder"
     )
+    _PATCHED = True
+
+
+def unregister_fake_embedder() -> None:
+    """Restore the real ``openai`` embedder class. Idempotent."""
+    global _ORIGINAL, _PATCHED
+    if not _PATCHED:
+        return
+    if _ORIGINAL is None:
+        EmbedderFactory.provider_to_class.pop(FAKE_PROVIDER, None)
+    else:
+        EmbedderFactory.provider_to_class[FAKE_PROVIDER] = _ORIGINAL
+    _ORIGINAL = None
+    _PATCHED = False

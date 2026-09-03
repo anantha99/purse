@@ -34,7 +34,11 @@ from purse.db.repo import Repo, create_workspace
 from purse.memory import rebuild, service
 from purse.memory.mem0_engine import EmbeddingConfig, Mem0Engine
 from tests.conftest import StubContext
-from tests.memory.fake_embedder import FAKE_PROVIDER, register_fake_embedder
+from tests.memory.fake_embedder import (
+    FAKE_PROVIDER,
+    register_fake_embedder,
+    unregister_fake_embedder,
+)
 
 pytestmark = pytest.mark.db
 
@@ -43,14 +47,17 @@ pytestmark = pytest.mark.db
 def mem0_engine(test_database_url: str, tmp_path: Path) -> Iterator[Mem0Engine]:
     """A Mem0 engine on the throwaway database, embedding with the fake provider."""
     register_fake_embedder()
-    engine = Mem0Engine(
-        embedding=EmbeddingConfig(api_key="fake-key", provider=FAKE_PROVIDER, dims=1536),
-        database_url=test_database_url,
-        # A per-test SQLite history path — the default is a shared ~/.mem0 file
-        # that concurrent tests would lock each other out of.
-        history_db_path=str(tmp_path / "mem0-history.db"),
-    )
-    yield engine
+    try:
+        engine = Mem0Engine(
+            embedding=EmbeddingConfig(api_key="fake-key", provider=FAKE_PROVIDER, dims=1536),
+            database_url=test_database_url,
+            # A per-test SQLite history path — the default is a shared ~/.mem0 file
+            # that concurrent tests would lock each other out of.
+            history_db_path=str(tmp_path / "mem0-history.db"),
+        )
+        yield engine
+    finally:
+        unregister_fake_embedder()
 
 
 def _second_workspace(session: Session, user: User) -> StubContext:
