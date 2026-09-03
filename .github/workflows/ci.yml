@@ -169,3 +169,32 @@ jobs:
           grep -q '"client_id_metadata_document_supported": *true' meta.json \
             || { echo "::error::CIMD flag missing from discovery metadata"; docker logs purse_smoke; docker rm -f purse_smoke; exit 1; }
           docker rm -f purse_smoke
+
+  web:
+    name: Web build (Next.js)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        # A production build on Linux — this is what catches route/resolution
+        # differences that don't reproduce on a local dev machine (the app/app
+        # -> /dashboard collision, for one).
+        run: npm run build

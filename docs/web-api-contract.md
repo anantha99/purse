@@ -67,8 +67,8 @@ Same shape as the rest of Purse: `{"error":{"code","message"}}`. Codes:
 
 ## Frontend routes (Next.js app-router)
 - `/` — public landing (the pitch, OSS/self-host, GitHub, copy-MCP-URL). No auth.
-- `/login` — operator login. On success → `/app/memories`.
-- `/app/*` — auth-gated dashboard (middleware redirects to `/login` without a session): `memories`, `skills`, `connections`, `tokens`, `audit`. `apis` is a "coming soon" stub (C6). Export is an action, not a page.
+- `/login` — operator login. On success → `/dashboard/memories`.
+- `/dashboard/*` — auth-gated dashboard (middleware redirects to `/login` without a session): `memories`, `skills`, `connections`, `tokens`, `audit`. `apis` is a "coming soon" stub (C6). Export is an action, not a page.
 - Design: match `docs/design/purse-design-direction.html` exactly — tokens (brass `#C9A24B` sole accent, graphite grounds, mono for all technical text), the four screens shown there, dark-first with a light theme on the same tokens.
 
 ## Config / env

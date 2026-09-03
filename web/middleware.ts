@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { SESSION_COOKIE } from "@/lib/session";
 
-// Gate /app/* on the presence of the session cookie. The cookie is httpOnly so
+// Gate /dashboard/* on the presence of the session cookie. The cookie is httpOnly so
 // the browser JS never reads the token; middleware only checks presence and the
 // backend remains the real authority (an expired token yields 401 downstream,
 // and the client redirects to /login on 401).

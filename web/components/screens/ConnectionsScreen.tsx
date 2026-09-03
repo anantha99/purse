@@ -6,7 +6,7 @@ import { api, ApiClientError } from "@/lib/api";
 import type { Connection } from "@/lib/types";
 import CopyMcp from "@/components/CopyMcp";
 import { EmptyState, ErrorBanner, Loading } from "@/components/ui";
-import { relativeTime } from "@/lib/format";
+import { relativeTime, formatAuthMode } from "@/lib/format";
 
 export default function ConnectionsScreen({ mcpUrl }: { mcpUrl: string }) {
   const [rows, setRows] = useState<Connection[] | null>(null);
@@ -87,7 +87,7 @@ export default function ConnectionsScreen({ mcpUrl }: { mcpUrl: string }) {
                       </span>
                     </div>
                   </div>
-                  <div className="amode">{c.auth_mode}</div>
+                  <div className="amode">{formatAuthMode(c.auth_mode)}</div>
                   <div className="scopes">
                     {c.scopes.map((s) => (
                       <span
