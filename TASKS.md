@@ -84,10 +84,10 @@ Order chosen by which client each mode unblocks (§9), not by spec elegance.
 - [x] C3.1 Canonical write path: `add_memory` → verbatim insert with provenance (sync) → audit; ≤4096 UTF-8 *bytes*; engine ingest best-effort, never loses a write *(PR #2)*
 - [x] C3.2 Supersession + tombstone: `update_memory` writes new row w/ `supersedes`; `delete_memory` tombstones (idempotent); keyset-paginated list over current view *(PR #2)*
 - [x] C3.3 `MemoryEngine` interface (ingest/search/rebuild/drop) + `NullEngine`; ILIKE text-search fallback until Mem0 (C3.4). Failures can't fail a canonical write — AST-asserted no unguarded engine call *(PR #2)*
-- [ ] C3.4 Mem0 OSS adapter (embedded, pin `mem0ai==2.0.19`): async ingest via background task queue; ingest failure = canonical write still succeeds. Config: always set `embedding_model_dims` explicitly (open P1 bug — silent data loss if unset); note history store is SQLite-only
-- [ ] C3.4b **Mem0 ranking verification test (do FIRST, ~1 hr):** open issue #6883 — pgvector returns cosine *distance* but `score_and_rank` treats it as *similarity*, inverting rankings. Seed 50 memories, verify top-k is actually nearest. If broken: patch/workaround or lean on our own pgvector fallback (C3.5) for ranking
-- [ ] C3.5 Semantic search: pgvector fallback + Mem0 recall, ranked results with provenance
-- [ ] C3.6 Index rebuild command: drop + replay canonical log (proves "derived, droppable" §3.1–2)
+- [x] C3.4 Mem0 adapter `Mem0Engine` (`mem0ai==2.0.19`, `infer=False` verbatim, pgvector `purse_mem0` collection, dims in both keys, telemetry off); best-effort ingest — failure never loses a canonical write. Env-gated: no embedding key → NullEngine + ILIKE *(PR #7)*
+- [x] C3.4b **Ranking spike DONE** — bug #6883 is **FIXED in 2.0.19** (source-traced, no workaround); CI regression guard added `(docs/spikes/mem0-ranking-spike.md)` *(PR #7)*
+- [x] C3.5 Semantic search: Mem0 recall ranked, mapped back to **canonical rows + provenance** (Mem0 ranks, canonical is truth); superseded/tombstoned hydrated out; ILIKE fallback. Pluggable OpenAI-compatible embedder *(PR #7)*
+- [x] C3.6 Rebuild `python -m purse.memory.rebuild`: drop + replay canonical current view (proves derived/droppable §3.1–2) *(PR #7)*
 - [x] C3.7 **`purse-save-policy` skill** — versioned artifact `purse/skills/seeds/purse-save-policy.md`; seeded into new vaults; iterate wording via its own issues (§8.2, product surface) *(PR #6)*
 - [x] C3.8 REST `/v1/memories` CRUD + search, PRD-shaped structured errors, `X-Purse-Agent` per-call claim; `purse/gateway/app.py` wires real PAT auth *(PR #2)*
 
