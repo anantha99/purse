@@ -1,0 +1,524 @@
+<title>Purse — Design Direction</title>
+<style>
+  /* Deliberately dark-first: Purse is a developer tool pitched as a dark
+     visual world (a vault). Colors are painted explicitly so the page holds
+     on any host ground; the production app adds a light theme on the same tokens. */
+  :root {
+    --bg: #0E1113;
+    --surface: #15181B;
+    --surface-2: #1B1F23;
+    --raised: #21262B;
+    --border: #262C31;
+    --border-soft: #1F2429;
+    --text: #E8EBED;
+    --muted: #949BA3;
+    --faint: #6B727A;
+    --accent: #C9A24B;      /* brass — the clasp */
+    --accent-soft: rgba(201,162,75,0.12);
+    --accent-line: rgba(201,162,75,0.34);
+    --ok: #58BD96;
+    --ok-soft: rgba(88,189,150,0.12);
+    --danger: #E0685E;
+    --danger-soft: rgba(224,104,94,0.12);
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    --maxw: 1080px;
+    --radius: 10px;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  a { color: inherit; }
+  ::selection { background: var(--accent-soft); }
+
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+  .mono { font-family: var(--mono); }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* ---- document header ---- */
+  .doc-head {
+    border-bottom: 1px solid var(--border-soft);
+    padding: 34px 0 30px;
+  }
+  .doc-head .wrap { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 18px; }
+  .doc-head h1 {
+    margin: 6px 0 0;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .doc-head p { margin: 6px 0 0; color: var(--muted); font-size: 14px; max-width: 60ch; }
+  .clasp {
+    display: inline-flex; align-items: center; gap: 9px;
+    font-family: var(--mono); font-weight: 600; letter-spacing: 0.02em;
+  }
+  .clasp .dot {
+    width: 13px; height: 13px; border-radius: 3px;
+    background: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+
+  /* ---- board framing ---- */
+  .board { padding: 46px 0 8px; }
+  .board > .wrap > .caption {
+    display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px;
+  }
+  .caption .idx {
+    font-family: var(--mono); color: var(--accent); font-size: 12px; letter-spacing: 0.08em;
+  }
+  .caption .title { font-size: 13px; color: var(--muted); }
+  .frame {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--surface);
+    overflow: hidden;
+    box-shadow: 0 24px 60px -30px rgba(0,0,0,0.8);
+  }
+  .chrome {
+    display: flex; align-items: center; gap: 8px;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--border-soft);
+    background: var(--surface-2);
+  }
+  .chrome .lights { display: flex; gap: 6px; }
+  .chrome .lights i { width: 10px; height: 10px; border-radius: 50%; background: var(--raised); display: block; }
+  .chrome .url {
+    margin-left: 8px; font-family: var(--mono); font-size: 12px; color: var(--faint);
+  }
+
+  /* ================= BOARD 1 — LANDING ================= */
+  .landing {
+    position: relative;
+    padding: clamp(52px, 8vw, 92px) clamp(24px, 6vw, 72px) clamp(48px, 6vw, 72px);
+    background:
+      radial-gradient(120% 90% at 88% -10%, rgba(201,162,75,0.10), transparent 60%),
+      linear-gradient(180deg, #101316, #0D0F11);
+  }
+  .landing .kicker { margin-bottom: 22px; }
+  .landing h2 {
+    margin: 0;
+    font-size: clamp(34px, 5.4vw, 56px);
+    line-height: 1.04;
+    letter-spacing: -0.028em;
+    font-weight: 620;
+    text-wrap: balance;
+    max-width: 15ch;
+  }
+  .landing h2 .thin { color: var(--muted); font-weight: 400; }
+  .landing .lede {
+    margin: 22px 0 0; color: var(--muted); font-size: clamp(15px, 1.6vw, 17px);
+    max-width: 54ch; line-height: 1.62;
+  }
+  .landing .lede b { color: var(--text); font-weight: 600; }
+
+  .url-hero {
+    margin-top: 32px;
+    display: inline-flex; align-items: stretch; gap: 0;
+    border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+    background: #0C0E10;
+  }
+  .url-hero .label {
+    display: flex; align-items: center; padding: 0 14px;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--faint); border-right: 1px solid var(--border); background: var(--surface-2);
+  }
+  .url-hero .val {
+    display: flex; align-items: center; gap: 12px; padding: 13px 16px;
+    font-family: var(--mono); font-size: 15px; color: var(--text);
+  }
+  .url-hero .copy {
+    align-self: center; margin-right: 8px;
+    font-family: var(--mono); font-size: 11px; color: var(--accent);
+    border: 1px solid var(--accent-line); background: var(--accent-soft);
+    padding: 5px 9px; border-radius: 6px; cursor: pointer;
+  }
+
+  .cta-row { margin-top: 26px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .btn {
+    font-family: var(--sans); font-size: 14px; font-weight: 560;
+    padding: 11px 18px; border-radius: 8px; cursor: pointer; border: 1px solid transparent;
+    display: inline-flex; align-items: center; gap: 9px; text-decoration: none;
+  }
+  .btn-primary { background: var(--accent); color: #1A150A; border-color: var(--accent); }
+  .btn-primary:hover { background: #D8B25C; }
+  .btn-ghost { background: transparent; color: var(--text); border-color: var(--border); }
+  .btn-ghost:hover { border-color: var(--faint); }
+  .btn .g { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .btn-primary .g { color: #4A3E1D; }
+
+  .trust {
+    margin-top: 40px; padding-top: 22px; border-top: 1px solid var(--border-soft);
+    display: flex; flex-wrap: wrap; gap: 10px 26px;
+  }
+  .trust span { font-family: var(--mono); font-size: 12px; color: var(--faint); display: inline-flex; gap: 8px; align-items: center; }
+  .trust span::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); opacity: 0.8; }
+
+  /* ================= APP SHELL (boards 3 & 4) ================= */
+  .app { display: grid; grid-template-columns: 210px 1fr; min-height: 460px; }
+  .side { border-right: 1px solid var(--border-soft); background: var(--surface-2); padding: 16px 12px; }
+  .side .brand { display: flex; align-items: center; gap: 9px; padding: 6px 8px 16px; }
+  .side .brand .dot { width: 12px; height: 12px; border-radius: 3px; background: var(--accent); }
+  .side .brand b { font-size: 14px; letter-spacing: -0.01em; }
+  .side .ws {
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    border: 1px solid var(--border); border-radius: 7px; padding: 7px 9px; margin: 0 4px 14px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .side nav { display: flex; flex-direction: column; gap: 1px; }
+  .side nav a {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 10px; border-radius: 7px; font-size: 13.5px; color: var(--muted); text-decoration: none;
+  }
+  .side nav a .c { font-family: var(--mono); font-size: 11px; color: var(--faint); }
+  .side nav a:hover { background: var(--raised); color: var(--text); }
+  .side nav a.active { background: var(--accent-soft); color: var(--text); }
+  .side nav a.active .c { color: var(--accent); }
+  .side .soon { color: var(--faint); }
+  .side .soon .c { color: var(--faint); }
+
+  .main { display: flex; flex-direction: column; }
+  .topbar {
+    display: flex; align-items: center; gap: 14px; justify-content: space-between;
+    padding: 14px 18px; border-bottom: 1px solid var(--border-soft);
+  }
+  .topbar .h { font-size: 15px; font-weight: 600; }
+  .topbar .sub { font-family: var(--mono); font-size: 11px; color: var(--faint); margin-left: 2px; }
+  .search {
+    flex: 1; max-width: 340px; margin-left: auto;
+    display: flex; align-items: center; gap: 9px;
+    border: 1px solid var(--border); border-radius: 8px; padding: 8px 11px;
+    background: var(--bg); color: var(--faint); font-family: var(--mono); font-size: 12.5px;
+  }
+  .copy-url {
+    display: inline-flex; align-items: center; gap: 8px;
+    border: 1px solid var(--border); border-radius: 8px; padding: 8px 11px;
+    font-family: var(--mono); font-size: 12px; color: var(--muted); cursor: pointer; background: var(--bg);
+  }
+  .copy-url b { color: var(--accent); font-weight: 500; }
+
+  .content { padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+
+  /* memory rows */
+  .mrow {
+    border: 1px solid var(--border-soft); border-radius: var(--radius);
+    background: var(--surface-2); padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .mrow .body { font-size: 15px; color: var(--text); line-height: 1.5; }
+  .mrow .meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .pill {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.02em;
+    padding: 3px 8px; border-radius: 999px; border: 1px solid var(--border);
+    color: var(--muted); display: inline-flex; gap: 6px; align-items: center;
+  }
+  .pill.kind { color: var(--accent); border-color: var(--accent-line); background: var(--accent-soft); }
+  .pill .k { color: var(--faint); }
+  .prov { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--faint); display: flex; gap: 14px; }
+  .prov .who { color: var(--muted); }
+  .hist {
+    font-family: var(--mono); font-size: 11px; color: var(--faint);
+    display: inline-flex; align-items: center; gap: 7px;
+  }
+  .hist::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--faint); }
+
+  /* connections table */
+  .ctable { border: 1px solid var(--border-soft); border-radius: var(--radius); overflow: hidden; }
+  .ctable .r {
+    display: grid; grid-template-columns: 1.4fr 1fr 1.5fr auto;
+    gap: 14px; align-items: center; padding: 13px 16px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .ctable .r:last-child { border-bottom: 0; }
+  .ctable .r.head {
+    background: var(--surface-2); padding: 9px 16px;
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint);
+  }
+  .client { display: flex; align-items: center; gap: 10px; }
+  .client .st { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); flex: none; }
+  .client .st.off { background: var(--faint); box-shadow: none; }
+  .client b { font-weight: 560; font-size: 14px; }
+  .client .id { font-family: var(--mono); font-size: 11px; color: var(--faint); }
+  .amode { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .scopes { display: flex; flex-wrap: wrap; gap: 5px; }
+  .scope { font-family: var(--mono); font-size: 10.5px; color: var(--muted); border: 1px solid var(--border); border-radius: 5px; padding: 2px 6px; }
+  .scope.w { color: var(--accent); border-color: var(--accent-line); }
+  .badge-writes {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--accent); background: var(--accent-soft); border: 1px solid var(--accent-line);
+    padding: 3px 7px; border-radius: 5px;
+  }
+  .revoke {
+    font-family: var(--mono); font-size: 11.5px; color: var(--danger);
+    border: 1px solid transparent; background: transparent; padding: 5px 9px; border-radius: 6px; cursor: pointer;
+  }
+  .revoke:hover { background: var(--danger-soft); border-color: rgba(224,104,94,0.3); }
+
+  /* ================= BOARD 2 — LOGIN ================= */
+  .login-stage {
+    background: radial-gradient(90% 70% at 50% 0%, rgba(201,162,75,0.07), transparent 55%), #0D0F11;
+    padding: 64px 24px; display: flex; justify-content: center;
+  }
+  .login-card {
+    width: 100%; max-width: 380px;
+    border: 1px solid var(--border); border-radius: 14px; background: var(--surface);
+    padding: 30px 28px; box-shadow: 0 30px 70px -40px rgba(0,0,0,0.9);
+  }
+  .login-card .mark { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; }
+  .login-card .mark .dot { width: 15px; height: 15px; border-radius: 4px; background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+  .login-card .mark b { font-family: var(--mono); letter-spacing: 0.02em; }
+  .login-card h3 { margin: 0 0 4px; font-size: 20px; letter-spacing: -0.015em; }
+  .login-card .sub { margin: 0 0 22px; color: var(--muted); font-size: 13.5px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); margin-bottom: 7px; }
+  .field .input {
+    width: 100%; border: 1px solid var(--border); border-radius: 8px; background: var(--bg);
+    padding: 11px 12px; font-family: var(--mono); font-size: 13px; color: var(--text);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .field .input.filled { color: var(--muted); }
+  .login-card .btn-primary { width: 100%; justify-content: center; margin-top: 6px; }
+  .login-note {
+    margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border-soft);
+    font-family: var(--mono); font-size: 11.5px; color: var(--faint); line-height: 1.6;
+  }
+  .login-note b { color: var(--muted); font-weight: 500; }
+
+  /* footer note */
+  .foot { padding: 40px 0 60px; }
+  .foot .wrap { color: var(--faint); font-size: 13px; }
+  .foot .mono { font-size: 12px; }
+
+  @media (max-width: 720px) {
+    .app { grid-template-columns: 1fr; }
+    .side { display: none; }
+    .prov { margin-left: 0; width: 100%; }
+    .ctable .r { grid-template-columns: 1fr; gap: 8px; }
+    .ctable .r.head { display: none; }
+    .url-hero { flex-direction: column; align-items: stretch; }
+    .url-hero .label { border-right: 0; border-bottom: 1px solid var(--border); }
+  }
+</style>
+
+<header class="doc-head">
+  <div class="wrap">
+    <div style="width:100%; display:flex; justify-content:space-between; align-items:baseline; gap:16px; flex-wrap:wrap;">
+      <span class="clasp"><span class="dot"></span>PURSE</span>
+      <span class="eyebrow">Design direction · v1 · dark-first</span>
+    </div>
+    <h1>The visual language for the open-source product</h1>
+    <p>Four representative screens — landing, operator login, and two dashboard views — in the direction we're proposing. Approve the look here and the Next.js build follows it exactly.</p>
+  </div>
+</header>
+
+<!-- ============ BOARD 1 — LANDING ============ -->
+<section class="board">
+  <div class="wrap">
+    <div class="caption"><span class="idx">01</span><span class="title">Landing — the public homepage</span></div>
+    <div class="frame">
+      <div class="chrome"><span class="lights"><i></i><i></i><i></i></span><span class="url">purse.dev</span></div>
+      <div class="landing">
+        <div class="kicker eyebrow">Open-source · Apache&nbsp;2.0 · self-host in one command</div>
+        <h2>One purse.<br><span class="thin">Every agent opens it.</span></h2>
+        <p class="lede">A portable vault for agent <b>memory</b>, <b>skills</b>, and <b>API keys</b> — exposed through a single MCP URL. Chrome doesn't sync passwords with Safari; both ask the same vault. Purse does that for your agents. <b>Keys never enter model context.</b></p>
+
+        <div class="url-hero">
+          <span class="label">MCP</span>
+          <span class="val">https://your-vault.dev/mcp</span>
+          <button class="copy" type="button">copy</button>
+        </div>
+
+        <div class="cta-row">
+          <a class="btn btn-primary" href="#">Self-host it <span class="g">docker compose up</span></a>
+          <a class="btn btn-ghost" href="#">Star on GitHub <span class="g num">★ 1.2k</span></a>
+        </div>
+
+        <div class="trust">
+          <span>Verbatim canonical store</span>
+          <span>Provenance on every write</span>
+          <span>Proxy-only secrets</span>
+          <span>Full JSON export, always</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ BOARD 2 — LOGIN ============ -->
+<section class="board">
+  <div class="wrap">
+    <div class="caption"><span class="idx">02</span><span class="title">Operator login — human session, single operator (self-host)</span></div>
+    <div class="frame">
+      <div class="chrome"><span class="lights"><i></i><i></i><i></i></span><span class="url">your-vault.dev/login</span></div>
+      <div class="login-stage">
+        <div class="login-card">
+          <div class="mark"><span class="dot"></span><b>purse</b></div>
+          <h3>Open your purse</h3>
+          <p class="sub">Sign in to the vault running on this instance.</p>
+          <div class="field">
+            <label>Email</label>
+            <div class="input filled">owner@localhost</div>
+          </div>
+          <div class="field">
+            <label>Password</label>
+            <div class="input">••••••••••••</div>
+          </div>
+          <button class="btn btn-primary" type="button">Sign in</button>
+          <div class="login-note">
+            Single-operator instance. Set the password on first boot with <b>PURSE_OWNER_PASSWORD</b>, or from the printed bootstrap credentials. Agents authenticate separately — with tokens, never this password.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ BOARD 3 — DASHBOARD / MEMORIES ============ -->
+<section class="board">
+  <div class="wrap">
+    <div class="caption"><span class="idx">03</span><span class="title">Dashboard — Memories, the vault's core view</span></div>
+    <div class="frame">
+      <div class="chrome"><span class="lights"><i></i><i></i><i></i></span><span class="url">your-vault.dev/app/memories</span></div>
+      <div class="app">
+        <aside class="side">
+          <div class="brand"><span class="dot"></span><b>purse</b></div>
+          <div class="ws"><span>Personal</span><span>▾</span></div>
+          <nav>
+            <a class="active" href="#">Memories <span class="c num">128</span></a>
+            <a href="#">Skills <span class="c num">3</span></a>
+            <a class="soon" href="#">APIs <span class="c">soon</span></a>
+            <a href="#">Connections <span class="c num">4</span></a>
+            <a href="#">Audit <span class="c">›</span></a>
+            <a href="#">Export <span class="c">›</span></a>
+          </nav>
+        </aside>
+        <div class="main">
+          <div class="topbar">
+            <div><span class="h">Memories</span> <span class="sub">append-only · current view</span></div>
+            <div class="search"><span>⌕</span><span>search by meaning…</span></div>
+            <div class="copy-url">MCP&nbsp; <b>copy url</b></div>
+          </div>
+          <div class="content">
+
+            <div class="mrow">
+              <div class="body">I prefer TypeScript with strict mode, and pnpm over npm.</div>
+              <div class="meta">
+                <span class="pill kind">preference</span>
+                <span class="pill"><span class="k">from</span> cursor</span>
+                <span class="prov"><span class="who">user-initiated</span><span>2d ago</span></span>
+              </div>
+            </div>
+
+            <div class="mrow">
+              <div class="body">Deploys go out Tuesdays and Thursdays only — never on a Friday.</div>
+              <div class="meta">
+                <span class="pill kind">decision</span>
+                <span class="pill"><span class="k">from</span> claude-code</span>
+                <span class="prov"><span class="who">agent-initiated</span><span>5d ago</span></span>
+              </div>
+              <div class="hist">supersedes an earlier version · 1 in history</div>
+            </div>
+
+            <div class="mrow">
+              <div class="body">Primary Postgres is on Neon, region us-east-2; pgvector enabled.</div>
+              <div class="meta">
+                <span class="pill kind">fact</span>
+                <span class="pill"><span class="k">from</span> codex</span>
+                <span class="prov"><span class="who">agent-initiated</span><span>1w ago</span></span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ BOARD 4 — DASHBOARD / CONNECTIONS ============ -->
+<section class="board">
+  <div class="wrap">
+    <div class="caption"><span class="idx">04</span><span class="title">Dashboard — Connections, six auth modes, one glance</span></div>
+    <div class="frame">
+      <div class="chrome"><span class="lights"><i></i><i></i><i></i></span><span class="url">your-vault.dev/app/connections</span></div>
+      <div class="app">
+        <aside class="side">
+          <div class="brand"><span class="dot"></span><b>purse</b></div>
+          <div class="ws"><span>Personal</span><span>▾</span></div>
+          <nav>
+            <a href="#">Memories <span class="c num">128</span></a>
+            <a href="#">Skills <span class="c num">3</span></a>
+            <a class="soon" href="#">APIs <span class="c">soon</span></a>
+            <a class="active" href="#">Connections <span class="c num">4</span></a>
+            <a href="#">Audit <span class="c">›</span></a>
+            <a href="#">Export <span class="c">›</span></a>
+          </nav>
+        </aside>
+        <div class="main">
+          <div class="topbar">
+            <div><span class="h">Connections</span> <span class="sub">who can open this vault</span></div>
+            <div class="copy-url" style="margin-left:auto;">＋&nbsp; <b>new token</b></div>
+          </div>
+          <div class="content">
+            <div class="ctable">
+              <div class="r head"><span>Client</span><span>Auth mode</span><span>Scopes</span><span></span></div>
+
+              <div class="r">
+                <div class="client"><span class="st"></span><div><b>Claude&nbsp;Code</b> <span class="id">· cimd</span></div></div>
+                <div class="amode">oauth · cimd + pkce</div>
+                <div class="scopes"><span class="scope">memory:read</span><span class="scope">skills:read</span></div>
+                <div><button class="revoke" type="button">revoke</button></div>
+              </div>
+
+              <div class="r">
+                <div class="client"><span class="st"></span><div><b>Cursor</b> <span class="id">· static</span></div></div>
+                <div class="amode">oauth · static client</div>
+                <div class="scopes"><span class="scope">memory:read</span><span class="scope w">memory:write</span> <span class="badge-writes">writes on</span></div>
+                <div><button class="revoke" type="button">revoke</button></div>
+              </div>
+
+              <div class="r">
+                <div class="client"><span class="st"></span><div><b>Codex</b> <span class="id">· pat</span></div></div>
+                <div class="amode">token · purse_pat_…KBXw</div>
+                <div class="scopes"><span class="scope">memory:read</span><span class="scope">apis:use</span></div>
+                <div><button class="revoke" type="button">revoke</button></div>
+              </div>
+
+              <div class="r">
+                <div class="client"><span class="st off"></span><div><b>OpenClaw</b> <span class="id">· pat · idle</span></div></div>
+                <div class="amode">token · scoped read-only</div>
+                <div class="scopes"><span class="scope">memory:read</span></div>
+                <div><button class="revoke" type="button">revoke</button></div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="foot">
+  <div class="wrap">
+    <div class="eyebrow" style="margin-bottom:10px;">Notes</div>
+    <p class="mono">Brass <span style="color:var(--accent)">#C9A24B</span> is the only accent — reserved for the vault mark, primary actions, and the “writes on” signal. Green = connected, red = revoke; neither is the accent. Everything technical is set in monospace. Light theme ships on the same tokens for the production app.</p>
+  </div>
+</footer>
