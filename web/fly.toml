@@ -1,0 +1,29 @@
+# Fly.io deployment for the Purse web dashboard (Next.js).
+# Separate app from the backend; talks to it server-side via the BFF proxy
+# (PURSE_BACKEND_URL). Secrets (none required) would go via `fly secrets`.
+
+app = "purse-web-staging"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  # Server-side base the BFF proxies to; the browser never sees this.
+  PURSE_BACKEND_URL = "https://purse-staging.fly.dev"
+  # Shown on the landing/onboarding as the vault's MCP endpoint.
+  PURSE_MCP_URL = "https://purse-staging.fly.dev/mcp"
+  # Session cookie is Secure (served over HTTPS).
+  PURSE_COOKIE_SECURE = "1"
+  PORT = "3000"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
