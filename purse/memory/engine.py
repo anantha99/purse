@@ -92,6 +92,20 @@ class MemoryEngine(ABC):
         """
 
     @abstractmethod
+    def forget(self, workspace_id: uuid.UUID, memory_id: uuid.UUID) -> None:
+        """Remove one canonical memory from the index (C3.4).
+
+        Called best-effort when a memory leaves the current view — superseded by
+        ``update_memory`` or tombstoned by ``delete_memory`` — so the index stops
+        proposing it. It is *not* a correctness dependency: the service hydrates
+        every hit from Postgres and drops ids that are no longer current, so a
+        stale index can never resurrect a superseded or tombstoned memory even if
+        ``forget`` never runs. ``forget`` merely keeps the index lean and its
+        rankings honest between rebuilds. Idempotent: forgetting an id the index
+        never held, or held and already dropped, is a no-op, not an error.
+        """
+
+    @abstractmethod
     def rebuild(self, workspace_id: uuid.UUID, records: Iterable[MemoryRecord]) -> None:
         """Replace this workspace's index from the canonical log (C3.6).
 
@@ -120,6 +134,9 @@ class NullEngine(MemoryEngine):
 
     def search(self, workspace_id: uuid.UUID, query: str, limit: int) -> list[EngineHit]:
         return []
+
+    def forget(self, workspace_id: uuid.UUID, memory_id: uuid.UUID) -> None:
+        return None
 
     def rebuild(self, workspace_id: uuid.UUID, records: Iterable[MemoryRecord]) -> None:
         return None

@@ -169,6 +169,7 @@ class RecordingEngine(MemoryEngine):
         self.hits = hits if hits is not None else []
         self.ingested: list[MemoryRecord] = []
         self.searched: list[tuple[uuid.UUID, str, int]] = []
+        self.forgotten: list[tuple[uuid.UUID, uuid.UUID]] = []
         self.rebuilt: list[uuid.UUID] = []
         self.dropped: list[uuid.UUID] = []
 
@@ -178,6 +179,9 @@ class RecordingEngine(MemoryEngine):
     def search(self, workspace_id: uuid.UUID, query: str, limit: int) -> list[EngineHit]:
         self.searched.append((workspace_id, query, limit))
         return list(self.hits[:limit])
+
+    def forget(self, workspace_id: uuid.UUID, memory_id: uuid.UUID) -> None:
+        self.forgotten.append((workspace_id, memory_id))
 
     def rebuild(self, workspace_id: uuid.UUID, records: Iterable[MemoryRecord]) -> None:
         self.rebuilt.append(workspace_id)
@@ -203,6 +207,9 @@ class RaisingEngine(MemoryEngine):
 
     def search(self, workspace_id: uuid.UUID, query: str, limit: int) -> list[EngineHit]:
         raise EngineFailure("search exploded")
+
+    def forget(self, workspace_id: uuid.UUID, memory_id: uuid.UUID) -> None:
+        raise EngineFailure("forget exploded")
 
     def rebuild(self, workspace_id: uuid.UUID, records: Iterable[MemoryRecord]) -> None:
         raise EngineFailure("rebuild exploded")

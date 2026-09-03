@@ -281,11 +281,22 @@ def update_memory(
     )
     record = MemoryRecord.from_model(row)
     _audit(repo, ctx, action="memory.update", target_id=record.id)
+    # The old row has left the current view. Forget it from the index and index
+    # the successor, so recall neither surfaces the superseded phrasing nor lags
+    # behind the edit. Both are best-effort; hydration in ``search_memory`` is the
+    # actual guarantee that a stale index cannot surface the old row.
+    _forget(engine, ctx.workspace_id, memory_id)
     _ingest(engine, record, ctx.workspace_id)
     return record
 
 
-def delete_memory(session: Session, ctx: WriteContext, *, memory_id: uuid.UUID) -> None:
+def delete_memory(
+    session: Session,
+    ctx: WriteContext,
+    *,
+    memory_id: uuid.UUID,
+    engine: MemoryEngine | None = None,
+) -> None:
     """Tombstone a memory (C3.2). Idempotent.
 
     The row survives — this is a flag, not a delete, and the database refuses to
@@ -297,15 +308,21 @@ def delete_memory(session: Session, ctx: WriteContext, *, memory_id: uuid.UUID) 
     not the current view, so deleting an already-superseded row is allowed —
     tombstoning history is a legitimate erasure request.
 
-    Takes no engine: removal from the index is C3.4's business (the engine is
-    rebuilt from the current view, which no longer contains this row), and there
-    is no engine call whose failure could be misread as the delete failing.
+    *engine* is optional. Removal from the index is **not** required for
+    correctness: ``search_memory`` hydrates every hit from the current view and
+    drops a tombstoned id, so a deleted memory cannot surface even while the index
+    still holds it (and a rebuild replays only the current view, dropping it for
+    good). When an engine is supplied the tombstone also fires a best-effort
+    ``forget`` so the index stops proposing the row immediately; its failure can
+    never be misread as the delete failing.
     """
     repo = _open_repo(session, ctx)
     if repo.get_memory(memory_id) is None:
         raise NotFoundError(f"memory {memory_id} not found in this workspace")
     repo.tombstone_memory(memory_id)
     _audit(repo, ctx, action="memory.delete", target_id=memory_id)
+    if engine is not None:
+        _forget(engine, ctx.workspace_id, memory_id)
 
 
 # ---------------------------------------------------------------------------
@@ -502,6 +519,26 @@ def _ingest(engine: MemoryEngine, record: MemoryRecord, workspace_id: uuid.UUID)
             "memory engine ingest failed for %s in workspace %s; "
             "canonical write is committed, index is stale",
             record.id,
+            workspace_id,
+            exc_info=True,
+        )
+
+
+def _forget(engine: MemoryEngine, workspace_id: uuid.UUID, memory_id: uuid.UUID) -> None:
+    """Best-effort index removal. The canonical supersede/tombstone has happened.
+
+    Same rule as :func:`_ingest`: a failure here must not turn a durable
+    supersession or tombstone into an error response. The worst case is an index
+    that still proposes a stale id — which ``search_memory`` filters out at
+    hydration and a rebuild (C3.6) clears — not a lost canonical mutation.
+    """
+    try:
+        engine.forget(workspace_id, memory_id)
+    except Exception:
+        logger.warning(
+            "memory engine forget failed for %s in workspace %s; "
+            "canonical mutation is committed, index is stale",
+            memory_id,
             workspace_id,
             exc_info=True,
         )

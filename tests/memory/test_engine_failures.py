@@ -88,8 +88,8 @@ def test_a_healthy_engine_is_passed_through_untouched(record: MemoryRecord) -> N
     assert engine.searched == [(WORKSPACE_ID, "thursday", 3)]
 
 
-ENGINE_METHODS = frozenset({"ingest", "search", "rebuild", "drop"})
-GUARDED_HELPERS = frozenset({"_ingest", "_engine_search"})
+ENGINE_METHODS = frozenset({"ingest", "search", "forget", "rebuild", "drop"})
+GUARDED_HELPERS = frozenset({"_ingest", "_engine_search", "_forget"})
 
 
 def test_no_unguarded_engine_call_exists_in_the_service() -> None:
