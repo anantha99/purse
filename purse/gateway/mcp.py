@@ -405,7 +405,7 @@ def create_mcp_server(
         ctx = _ToolContext(caller=caller)
         memory_id = _parse_id(id)
         with _mapped_errors(), _unit_of_work(session_factory) as session:
-            service.delete_memory(session, ctx, memory_id=memory_id)
+            service.delete_memory(session, ctx, memory_id=memory_id, engine=engine)
             return {"id": str(memory_id), "deleted": True}
 
     # -- skills tools (C4.4 / C5.3) -----------------------------------------

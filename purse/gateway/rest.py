@@ -489,7 +489,7 @@ def create_app(
     def delete_memory(memory_id: uuid.UUID, ctx: Ctx, session: Db) -> dict[str, Any]:
         require_scope(ctx.caller, MEMORY_WRITE)
         _limit_write(limiter, ctx)
-        service.delete_memory(session, ctx, memory_id=memory_id)
+        service.delete_memory(session, ctx, memory_id=memory_id, engine=engine)
         # 200 with a body, not 204: the tombstone is idempotent, and echoing the
         # id back is what makes a retry legible in a client's logs.
         return {"id": str(memory_id), "deleted": True}

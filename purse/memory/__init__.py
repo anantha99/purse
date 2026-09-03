@@ -21,6 +21,11 @@ from purse.memory.context import WriteContext
 from purse.memory.engine import EngineHit, MemoryEngine, NullEngine
 from purse.memory.errors import MemoryError_ as MemoryServiceError
 from purse.memory.errors import NotFoundError, PayloadTooLargeError, ValidationError
+from purse.memory.mem0_engine import (
+    EmbeddingConfig,
+    Mem0Engine,
+    build_memory_engine_from_env,
+)
 from purse.memory.records import MemoryRecord, Provenance, SearchHit
 from purse.memory.service import (
     DEFAULT_LIST_LIMIT,
@@ -40,7 +45,9 @@ __all__ = [
     "DEFAULT_SEARCH_LIMIT",
     "MAX_CONTENT_BYTES",
     "MAX_LIMIT",
+    "EmbeddingConfig",
     "EngineHit",
+    "Mem0Engine",
     "MemoryEngine",
     "MemoryPage",
     "MemoryRecord",
@@ -53,6 +60,7 @@ __all__ = [
     "ValidationError",
     "WriteContext",
     "add_memory",
+    "build_memory_engine_from_env",
     "delete_memory",
     "list_memories",
     "search_memory",

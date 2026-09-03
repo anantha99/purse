@@ -29,9 +29,11 @@ dependencies = [
     # pgvector/pgvector:pg17 image.
     "fastmcp==4.0.0",
     "itsdangerous>=2.2",
+    "mem0ai==2.0.19",
     "pgvector>=0.3.6",
     # psycopg 3. The binary extra ships wheels, so there is no libpq build step
     # on any supported interpreter (3.12-3.14).
+    "psycopg-pool>=3.2",
     "psycopg[binary]>=3.2",
     "pyyaml>=6.0.3",
     "sqlalchemy>=2.0.36",
@@ -134,6 +136,14 @@ pretty = true
 # pulling in another dependency for one import.
 [[tool.mypy.overrides]]
 module = ["yaml"]
+ignore_missing_imports = true
+
+# mem0ai ships no type stubs and no `py.typed`. The Mem0 adapter (C3.4) and the
+# deterministic fake embedder in the tests are the only importers; ignore the
+# missing stubs for the `mem0` package (and its submodules) alone rather than
+# loosening typing anywhere else.
+[[tool.mypy.overrides]]
+module = ["mem0", "mem0.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

@@ -31,7 +31,8 @@ from purse.db.session import create_db_engine, session_factory, session_scope
 from purse.gateway.app import create_default_app
 from purse.gateway.mcp import create_mcp_http_app, create_mcp_server
 from purse.gateway.ratelimit import RateLimiter
-from purse.memory.engine import MemoryEngine, NullEngine
+from purse.memory.engine import MemoryEngine
+from purse.memory.mem0_engine import build_memory_engine_from_env
 
 __all__ = ["create_purse_app", "create_purse_app_from_env"]
 
@@ -55,14 +56,24 @@ def create_purse_app(
     ``localhost``). *secret* signs the consent flow's pending-authorization
     tokens. *engine*/*memory_engine* are injectable for tests; production passes
     neither and gets a Postgres engine from *database_url*/``DATABASE_URL`` and a
-    :class:`NullEngine` (the Mem0 adapter arrives in C3.4). *limiter* is the
+    memory engine chosen by :func:`~purse.memory.mem0_engine.build_memory_engine_from_env`
+    (a Mem0 adapter when ``PURSE_EMBEDDING_API_KEY`` is set, else a
+    :class:`NullEngine`). *limiter* is the
     shared per-connection write limiter (PRD §13, C2.10); production passes none
     and gets the default 60/min limiter, while a test may inject a small one to
     prove the MCP and REST surfaces share one budget.
     """
     db_engine = engine if engine is not None else create_db_engine(database_url)
     make_session = session_factory(db_engine)
-    index = memory_engine if memory_engine is not None else NullEngine()
+    # The Mem0 adapter (C3.4) when an embedding key is configured, else a
+    # NullEngine — so staging without a key keeps the canonical + ILIKE path.
+    # ``build_memory_engine_from_env`` reads the resolved DB url so its index
+    # points at the same Postgres as the gateway.
+    index = (
+        memory_engine
+        if memory_engine is not None
+        else build_memory_engine_from_env(database_url=database_url)
+    )
 
     # ONE limiter, shared by both surfaces (PRD §13, C2.10): the token bucket is
     # keyed by connection_id, so a connection's 60 writes/min budget is the same
