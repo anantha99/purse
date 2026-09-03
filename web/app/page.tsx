@@ -2,12 +2,6 @@ import Link from "next/link";
 import CopyButton from "@/components/CopyButton";
 import ThemeToggle from "@/components/ThemeToggle";
 
-// Render at request time, not as a static prerender. The prerendered shell of
-// this route was resolving to a redirect in the Linux production build (not
-// reproducible in the local Windows build); dynamic rendering serves the real
-// landing component, which contains no redirect.
-export const dynamic = "force-dynamic";
-
 export default function LandingPage() {
   const mcpUrl = process.env.PURSE_MCP_URL || "https://your-vault.dev/mcp";
 

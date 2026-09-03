@@ -8,7 +8,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get("next") || "/app/memories";
+  const next = params.get("next") || "/dashboard/memories";
 
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -20,7 +20,7 @@ function LoginForm() {
     setBusy(true);
     try {
       await api.login(password);
-      router.replace(next.startsWith("/app") ? next : "/app/memories");
+      router.replace(next.startsWith("/dashboard") ? next : "/dashboard/memories");
       router.refresh();
     } catch (err) {
       if (err instanceof ApiClientError && err.code === "INVALID_CREDENTIALS") {

@@ -45,7 +45,7 @@ export default function ConnectionsScreen({ mcpUrl }: { mcpUrl: string }) {
           <span className="h">Connections</span>{" "}
           <span className="sub">who can open this vault</span>
         </div>
-        <Link className="copy-url" href="/app/tokens" style={{ marginLeft: "auto" }}>
+        <Link className="copy-url" href="/dashboard/tokens" style={{ marginLeft: "auto" }}>
           ＋&nbsp; <b>new token</b>
         </Link>
         <CopyMcp url={mcpUrl} />

@@ -10,7 +10,7 @@ export function middleware(req: NextRequest) {
   const hasSession = req.cookies.has(SESSION_COOKIE);
   const { pathname } = req.nextUrl;
 
-  if (pathname.startsWith("/app")) {
+  if (pathname.startsWith("/dashboard")) {
     if (!hasSession) {
       const url = req.nextUrl.clone();
       url.pathname = "/login";
@@ -22,7 +22,7 @@ export function middleware(req: NextRequest) {
   // Already signed in? Skip the login page.
   if (pathname === "/login" && hasSession) {
     const url = req.nextUrl.clone();
-    url.pathname = "/app/memories";
+    url.pathname = "/dashboard/memories";
     url.search = "";
     return NextResponse.redirect(url);
   }
@@ -31,5 +31,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/app/:path*", "/login"],
+  matcher: ["/dashboard/:path*", "/login"],
 };

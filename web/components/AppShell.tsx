@@ -15,16 +15,16 @@ type NavItem = {
 };
 
 const NAV: NavItem[] = [
-  { href: "/app/memories", label: "Memories", count: (c) => num(c?.memories) },
-  { href: "/app/skills", label: "Skills", count: (c) => num(c?.skills) },
-  { href: "/app/apis", label: "APIs", soon: true, count: () => "soon" },
+  { href: "/dashboard/memories", label: "Memories", count: (c) => num(c?.memories) },
+  { href: "/dashboard/skills", label: "Skills", count: (c) => num(c?.skills) },
+  { href: "/dashboard/apis", label: "APIs", soon: true, count: () => "soon" },
   {
-    href: "/app/connections",
+    href: "/dashboard/connections",
     label: "Connections",
     count: (c) => num(c?.connections),
   },
-  { href: "/app/tokens", label: "Tokens", count: () => "›" },
-  { href: "/app/audit", label: "Audit", count: () => "›" },
+  { href: "/dashboard/tokens", label: "Tokens", count: () => "›" },
+  { href: "/dashboard/audit", label: "Audit", count: () => "›" },
 ];
 
 function num(n?: number): string {

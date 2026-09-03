@@ -11,12 +11,12 @@ Next.js origin; the app forwards a session token to the backend server-side.
 | --- | --- |
 | `/` | Public landing — the pitch, self-host CTA, MCP URL with copy. |
 | `/login` | Operator login (single operator per instance). |
-| `/app/memories` | The core view — search, add, edit (supersede), delete (tombstone), history. |
-| `/app/connections` | Who can open the vault — auth mode, scopes, "writes on", revoke. |
-| `/app/skills` | Markdown editor with version bump on save. |
-| `/app/tokens` | Mint PATs (token shown once), list, revoke. |
-| `/app/audit` | Last 100 audit entries, newest first. |
-| `/app/apis` | Coming-soon stub. |
+| `/dashboard/memories` | The core view — search, add, edit (supersede), delete (tombstone), history. |
+| `/dashboard/connections` | Who can open the vault — auth mode, scopes, "writes on", revoke. |
+| `/dashboard/skills` | Markdown editor with version bump on save. |
+| `/dashboard/tokens` | Mint PATs (token shown once), list, revoke. |
+| `/dashboard/audit` | Last 100 audit entries, newest first. |
+| `/dashboard/apis` | Coming-soon stub. |
 | Export | Sidebar action → downloads the full-vault JSON. |
 
 ## Develop
@@ -60,7 +60,7 @@ bundle.
    The token never reaches client JS.
 3. Every `/api/*` route reads that cookie and forwards it to the backend as
    `Authorization: Bearer <token>`.
-4. `middleware.ts` gates `/app/*` on the cookie's presence, redirecting to
+4. `middleware.ts` gates `/dashboard/*` on the cookie's presence, redirecting to
    `/login` otherwise. A 401 from the backend also bounces the client to login.
 
 ## Docker
